@@ -1,0 +1,34 @@
+import graph_tf.projects.dagnn.callbacks
+import graph_tf.projects.dagnn.models
+import graph_tf.utils.torch_compat
+import kblocks.keras.optimizers
+
+model_fn = @gtf.dagnn.dagnn_citations
+
+gtf.dagnn.dagnn_citations.num_classes = %num_classes
+gtf.dagnn.dagnn_citations.dropout_rate = %dropout_rate
+gtf.dagnn.dagnn_citations.num_propagations = %num_propagations
+gtf.dagnn.dagnn_citations.hidden_size = %hidden_size
+
+callbacks = [@gtf.dagnn.EarlyStopping()]
+gtf.dagnn.EarlyStopping.patience = %patience
+gtf.dagnn.EarlyStopping.monitor = %monitor
+
+# import kblocks.extras.callbacks
+# callbacks = [@kb.callbacks.EarlyStopping()]
+# kb.callbacks.EarlyStopping.restore_best_weights = True
+# kb.callbacks.EarlyStopping.monitor = %monitor
+# kb.callbacks.EarlyStopping.patience = %patience
+
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.lr = %lr
+tf.keras.optimizers.Adam.epsilon = 1e-8  # pytorch default
+
+tf.keras.optimizers.Adam.gradient_transformers = [@gtf.utils.weight_decay_transformer()]
+gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
+
+lr = 1e-2
+hidden_size = 64
+epochs = 1000
+monitor = 'val_cross_entropy'
+patience = 100

@@ -1,0 +1,7 @@
+include 'gtf_config/data/citations/pub_med.gin'
+include 'gat/config/_base.gin'
+
+l2_reg = 5e-4
+final_heads = 8
+lr = 1e-2
+monitor = 'val_cross_entropy'

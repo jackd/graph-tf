@@ -1,0 +1,22 @@
+import graph_tf.data.single
+import graph_tf.projects.gcn.models
+import kblocks.extras.callbacks
+import kblocks.keras.optimizers
+
+model_fn = @gtf.gcn.gcn
+gtf.gcn.gcn.l2_reg = %l2_reg
+gtf.gcn.gcn.num_classes = %num_classes
+callbacks = [@kb.callbacks.EarlyStopping()]
+
+kb.callbacks.EarlyStopping.restore_best_weights = True
+kb.callbacks.EarlyStopping.monitor = %monitor
+kb.callbacks.EarlyStopping.patience = %patience
+
+patience = 10
+epochs = 200
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.lr = %lr
+
+monitor = 'val_cross_entropy'
+lr = 1e-2
+l2_reg = 2.5e-4

@@ -1,0 +1,5 @@
+include 'gtf_config/data/citations/cite_seer.gin'
+include 'gat/config/_base.gin'
+
+l2_reg = 2.5e-4
+final_heads = 1

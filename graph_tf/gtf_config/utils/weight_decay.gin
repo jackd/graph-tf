@@ -1,0 +1,12 @@
+# add weight_decay like
+# example usage
+
+# import kblocks.keras.optimizers
+# include 'gtf_config/utils.weight_decay.gin'
+# tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
+# weight_decay = 5e-4
+
+import graph_tf.utils.torch_compat
+
+gradient_transformers = [@gtf.utils.weight_decay_transformer()]
+gtf.utils.weight_decay_transformer.weight_decay = %weight_decay

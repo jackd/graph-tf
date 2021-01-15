@@ -1,0 +1,5 @@
+# Use l2-regularizer rather than gradient transforms
+gtf.utils.weight_decay_transformer.weight_decay = 0
+
+gtf.dagnn.dagnn_citations.l2_reg = @gtf.utils.weight_decay_to_l2()
+gtf.utils.weight_decay_to_l2.weight_decay = %weight_decay

@@ -1,0 +1,12 @@
+import graph_tf.data.single
+
+include "gtf_config/data/classification.gin"
+
+base_data = @gtf.data.citations_data()
+gtf.data.citations_data.name = %problem
+gtf.data.citations_data.largest_component_only = %largest_component_only
+
+data = @gtf.data.preprocess_single()
+gtf.data.preprocess_single.data = %base_data
+
+largest_component_only = False

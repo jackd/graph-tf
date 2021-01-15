@@ -1,0 +1,4 @@
+include "gtf_config/data/citations/_base.gin"
+
+problem = "pub_med"
+num_classes = 3

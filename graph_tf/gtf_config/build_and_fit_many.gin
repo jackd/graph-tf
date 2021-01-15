@@ -1,0 +1,6 @@
+include 'gtf_config/build_and_fit.gin'
+
+main.fn = @gtf.build_and_fit_many
+gtf.build_and_fit_many.repeats = %repeats
+
+repeats = 10
