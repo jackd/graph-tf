@@ -42,15 +42,15 @@ class UtilsOpsTest(tf.test.TestCase):
         np.testing.assert_equal(indices, [[0, 0]])
         np.testing.assert_equal(values, [3])
 
-    def test_renormalize_sparse(self):
+    def test_normalize_sparse(self):
         n = 100
         A = random_sparse((n, n), nnz=500, rng=tf.random.Generator.from_seed(0))
         A = tf.sparse.add(A, tf.sparse.eye(n))
         A = A.with_values(tf.abs(A.values))
         values, indices = self.evaluate((A.values, A.indices))
         A_sp = sp.coo_matrix((values, indices.T))
-        tf_impl = ops.renormalize_sparse(A)
-        sp_impl = scipy_utils.renormalize_sparse(A_sp)
+        tf_impl = ops.normalize_sparse(A)
+        sp_impl = scipy_utils.normalize_sparse(A_sp)
         sp_impl = sp_impl.tocsr(copy=False).tocoo(copy=False)  # force reorder
 
         row, col = tf.unstack(tf_impl.indices, axis=-1)

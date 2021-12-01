@@ -138,8 +138,8 @@ class ArnoldiTest(tf.test.TestCase):
         Qs, hs = arnoldi_iteration_tf(A, b, n, symmetric=True)
 
         Q, h = arnoldi_iteration_tf(A, b, n)
-        self.assertAllClose(Q, Qs, atol=1e-5)
-        self.assertAllClose(h, hs, atol=1e-5)
+        self.assertAllClose(Q, Qs, atol=1e-4)
+        self.assertAllClose(h, hs, atol=1e-4)
 
 
 if __name__ == "__main__":

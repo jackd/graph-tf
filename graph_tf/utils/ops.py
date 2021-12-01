@@ -1,5 +1,5 @@
 import functools
-from typing import Callable, NamedTuple, Optional, Sequence, Union
+from typing import Callable, NamedTuple, Optional, Sequence, Tuple, Union
 
 import tensorflow as tf
 import tensorflow.python.ops.linalg.sparse.sparse as sparse_lib  # pylint: disable=no-name-in-module
@@ -139,6 +139,15 @@ def unravel_index(indices, dense_shape, axis=0):
     return indices // scalar % dense_shape
 
 
+def unique_ravelled(
+    indices: tf.Tensor, dense_shape: tf.Tensor, axis: int = 0
+) -> Tuple[tf.Tensor, tf.Tensor]:
+    indices = ravel_multi_index(indices, dense_shape, axis=axis)
+    indices, idx = tf.unique(indices)
+    indices = unravel_index(indices, dense_shape, axis=axis)
+    return indices, idx
+
+
 def collect_sparse(st: tf.SparseTensor):
     """Collect values at duplicate indices of st."""
     dense_shape = tf.convert_to_tensor(st.dense_shape)
@@ -150,16 +159,17 @@ def collect_sparse(st: tf.SparseTensor):
     return sparse_tensor(indices, values, dense_shape)
 
 
-def renormalize_sparse(A: tf.SparseTensor, symmetric: bool = True):
+def normalize_sparse(A: tf.SparseTensor, symmetric: bool = True):
     row_sum = tf.sparse.reduce_sum(A, axis=1)
     tf.debugging.assert_non_negative(row_sum)
     i, j = tf.unstack(A.indices, axis=-1)
     if symmetric:
-        # d_vals = tf.math.reciprocal(tf.sqrt(row_sum))
-        d_vals = tf.pow(row_sum, -0.5)
+        d_vals = tf.math.rsqrt(row_sum)
+        d_vals = tf.where(row_sum == 0, tf.ones_like(d_vals), d_vals)
         values = A.values * tf.gather(d_vals, i, axis=0) * tf.gather(d_vals, j, axis=0)
     else:
         d_vals = tf.math.reciprocal(row_sum)
+        d_vals = tf.where(row_sum == 0, tf.ones_like(d_vals), d_vals)
         values = A.values * tf.gather(d_vals, i, axis=0)
     return A.with_values(values)
 
@@ -200,7 +210,7 @@ def chebyshev_polynomials(A: tf.SparseTensor, k: int) -> Sequence[tf.SparseTenso
         k+1 sparse tensors
     """
 
-    A = renormalize_sparse(A)
+    A = normalize_sparse(A)
     N = A.dense_shape[0]
     laplacian = subtract(tf.sparse.eye(N), A)
     largest_eigval = tf.squeeze(largest_eigs(laplacian, 1))
@@ -479,7 +489,9 @@ def assert_adjacency(adjacency):
     tf.debugging.assert_equal(*tf.unstack(adjacency.dense_shape))
 
 
-def to_laplacian(adjacency: tf.SparseTensor, normalize: bool = False):
+def to_laplacian(
+    adjacency: tf.SparseTensor, normalize: bool = False, shift: float = 0.0
+):
     weights = adjacency.values
     indices = adjacency.indices
     dense_shape = adjacency.dense_shape
@@ -494,11 +506,14 @@ def to_laplacian(adjacency: tf.SparseTensor, normalize: bool = False):
         factor = tf.math.pow(diag_values, -0.5)
         weights = weights * tf.gather(factor, i, axis=0) * tf.gather(factor, j, axis=0)
         diag_values = tf.ones((num_nodes,), dtype=dtype)
+    if shift:
+        diag_values = diag_values - shift
 
     diag = tf.SparseTensor(
         tf.tile(tf.expand_dims(tf.range(num_nodes, dtype=tf.int64), 1), (1, 2)),
         diag_values,
         dense_shape,
     )
-    neg_adj = tf.SparseTensor(indices, weights, dense_shape)
-    return tf.sparse.add(diag, neg_adj)
+    neg_adj = tf.SparseTensor(indices, -weights, dense_shape)
+    laplacian = tf.sparse.add(diag, neg_adj)
+    return laplacian

@@ -45,6 +45,8 @@ class EpochProgbarLogger(tf.keras.callbacks.Callback):
         self.epochs = params["epochs"]
 
     def on_train_begin(self, logs=None):
+        del logs
+
         class Universe:
             """Contains everything."""
 
@@ -63,11 +65,22 @@ class EpochProgbarLogger(tf.keras.callbacks.Callback):
         self.progbar.update(epoch + 1, list(logs.items()))
 
     def on_train_end(self, logs=None):
+        del logs
         if self.last_seen < self.progbar.target:
             if tf.version.VERSION < "2.3":
                 sys.stdout.write("\n")
             else:
                 self.progbar.update(self.last_seen, finalize=True)
+
+
+def unpack(data):
+    if data is None:
+        return data
+    if isinstance(data, tf.data.Dataset):
+        return data.get_single_element()
+    if len(data) == 1:
+        return data[0]
+    return data
 
 
 def fit_single(
@@ -102,10 +115,8 @@ def fit_single(
     Returns:
         history: `tf.keras.callbacks.History` object.
     """
-    if isinstance(train_data, tf.data.Dataset):
-        train_data = tf.data.experimental.get_single_element(train_data)
-    if isinstance(validation_data, tf.data.Dataset):
-        validation_data = tf.data.experimental.get_single_element(validation_data)
+    train_data = unpack(train_data)
+    validation_data = unpack(validation_data)
     do_validation = validation_data is not None
 
     params = dict(epochs=epochs, verbose=verbose, steps=1, do_validation=do_validation,)

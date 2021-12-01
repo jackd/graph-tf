@@ -1,0 +1,6 @@
+include "isgae/config/_base.gin"
+data = %base_data
+gtf.data.asymproj_data.features_fn = @gtf.data.random_features
+gtf.data.random_features.size = %random_size
+
+random_size = %embedding_dim

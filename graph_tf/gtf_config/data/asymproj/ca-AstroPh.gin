@@ -1,0 +1,3 @@
+include "gtf_config/data/asymproj/_base.gin"
+
+data_name = "ca-AstroPh"

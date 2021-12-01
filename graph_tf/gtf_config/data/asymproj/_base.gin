@@ -1,0 +1,14 @@
+include "gtf_config/data/gae.gin"
+
+data = @gtf.data.transformed()
+gtf.data.transformed.base = %base_data
+gtf.data.transformed.transforms = [
+    @gtf.data.to_autoencoder_split,
+]
+
+base_data = @gtf.data.asymproj_data()
+
+gtf.data.asymproj_data.name = %data_name
+gtf.data.asymproj_data.adjacency_transform = %adjacency_transform
+
+adjacency_transform = None

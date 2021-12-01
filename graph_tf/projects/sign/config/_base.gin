@@ -1,7 +1,6 @@
+import graph_tf.configurables
 import graph_tf.data.single
 import graph_tf.projects.sign.models
-import kblocks.extras.callbacks
-import kblocks.keras.optimizers
 
 model_fn = @gtf.sign.mlp
 gtf.sign.mlp.num_classes = %num_classes
@@ -13,16 +12,16 @@ data = @gtf.sign.preprocess_single()
 gtf.sign.preprocess_single.data = %base_data
 gtf.sign.preprocess_single.num_propagations = 4
 
-callbacks = [@kb.callbacks.EarlyStopping()]
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
 
-kb.callbacks.EarlyStopping.restore_best_weights = True
-kb.callbacks.EarlyStopping.monitor = %monitor
-kb.callbacks.EarlyStopping.patience = %patience
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
 
 patience = 100
 epochs = 2000
 optimizer = @tf.keras.optimizers.Adam()
-tf.keras.optimizers.Adam.lr = %lr
+tf.keras.optimizers.Adam.learning_rate = %lr
 
 monitor = 'val_cross_entropy'
 lr = 1e-2

@@ -1,6 +1,8 @@
 include 'gtf_config/build_and_fit.gin'
 
-main.fn = @gtf.build_and_fit_many
 gtf.build_and_fit_many.repeats = %repeats
+gtf.build_and_fit_many.seed = %seed
+gacl.main.fun = @gtf.build_and_fit_many
 
+seed = 0
 repeats = 10

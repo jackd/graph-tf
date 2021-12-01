@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from graph_tf.gat.models import gat
+from graph_tf.projects.gat.models import gat
 from graph_tf.utils.ops import indices_to_mask
 from graph_tf.utils.test_utils import random_sparse
 

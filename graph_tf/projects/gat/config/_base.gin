@@ -1,21 +1,20 @@
+import graph_tf.configurables
 import graph_tf.projects.gat.models
-import kblocks.extras.callbacks
-import kblocks.keras.optimizers
 
 model_fn = @gtf.gat.gat
 gtf.gat.gat.l2_reg = %l2_reg
 gtf.gat.gat.num_classes = %num_classes
 gtf.gat.gat.final_heads = %final_heads
-callbacks = [@kb.callbacks.EarlyStopping()]
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
 
-kb.callbacks.EarlyStopping.restore_best_weights = True
-kb.callbacks.EarlyStopping.monitor = %monitor
-kb.callbacks.EarlyStopping.patience = %patience
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
 
 patience = 100
 epochs = 2000
 optimizer = @tf.keras.optimizers.Adam()
-tf.keras.optimizers.Adam.lr = %lr
+tf.keras.optimizers.Adam.learning_rate = %lr
 
 monitor = 'val_acc'
 lr = 5e-3

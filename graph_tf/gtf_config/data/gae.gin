@@ -1,0 +1,22 @@
+import graph_tf.configurables
+
+loss = @tf.keras.losses.BinaryCrossentropy()
+tf.keras.losses.BinaryCrossentropy.reduction = 'sum'  # normalize weights instead
+
+weighted_metrics = [
+    %roc,
+    %pr,
+]
+
+roc = @tf.keras.metrics.AUC()
+pr = @tf.keras.metrics.AUC()
+
+roc/tf.keras.metrics.AUC.curve = 'ROC'
+roc/tf.keras.metrics.AUC.name = 'auc_roc'
+pr/tf.keras.metrics.AUC.curve = 'PR'
+pr/tf.keras.metrics.AUC.name = 'auc_pr'
+
+tf.keras.metrics.AUC.from_logits = %from_logits
+tf.keras.losses.BinaryCrossentropy.from_logits = %from_logits
+
+from_logits = True

@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from graph_tf.projects.dfnet.cvx_opt import dfnets_coefficients_optimizer
 from graph_tf.projects.dfnet.layers import DFNetConv
-from graph_tf.utils.ops import renormalize_sparse, sparse_negate
+from graph_tf.utils.ops import normalize_sparse, sparse_negate
 from graph_tf.utils.type_specs import keras_input
 
 
@@ -25,7 +25,7 @@ def preprocess_adj(
         indices, tf.ones((nnz,), dtype=tf.float32), (num_nodes, num_nodes)
     )
     adj = tf.sparse.add(adj, tf.sparse.eye(num_nodes))
-    adj = renormalize_sparse(adj)
+    adj = normalize_sparse(adj)
     # very confused about the idea behind this
     # based on
     # L = I - adj

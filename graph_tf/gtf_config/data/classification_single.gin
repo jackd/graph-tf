@@ -1,0 +1,11 @@
+import graph_tf.config
+import graph_tf.data.single
+
+data = @gin.singleton()
+data/gin.singleton.constructor = @gtf.data.preprocess_classification_single
+gtf.data.preprocess_classification_single.data = %base_data
+gtf.data.preprocess_classification_single.adjacency_transform = %adjacency_transform
+gtf.data.preprocess_classification_single.features_transform = %features_transform
+gtf.data.preprocess_classification_single.largest_component_only = %largest_component_only
+
+largest_component_only = False

@@ -1,0 +1,51 @@
+import graph_tf.configurables
+import graph_tf.data.single
+import graph_tf.data.transforms
+import graph_tf.projects.sgae
+import graph_tf.utils.models
+
+include "gtf_config/data/gae.gin"
+
+base_data = @gtf.data.asymproj_data()
+gtf.data.asymproj_data.name = %problem
+gtf.data.asymproj_data.use_all_train_edges = %use_all_train_edges
+gtf.data.asymproj_data.adjacency_transform = %adjacency_transform
+gtf.data.asymproj_data.remove_train_self_edges = True
+
+data = @gtf.sgae.get_spectral_split_v3()
+
+gtf.sgae.get_spectral_split_v3.data = %base_data
+gtf.sgae.get_spectral_split_v3.spectral_size = %spectral_size
+gtf.sgae.get_spectral_split_v3.batch_size = %batch_size
+
+adjacency_transform = [
+    @gtf.data.transforms.add_identity,
+    @gtf.data.transforms.normalize_symmetric,
+]
+
+model_fn = @gtf.sgae.sgae_v3
+gtf.sgae.sgae_v3.encoder_fn = @gtf.utils.models.mlp
+
+gtf.utils.models.mlp.output_units = %embedding_dim
+gtf.utils.models.mlp.hidden_units = %hidden_units
+gtf.utils.models.mlp.dropout_rate = %dropout_rate
+gtf.utils.models.mlp.dense_fn = @gtf.utils.models.dense
+
+gtf.utils.models.dense.kernel_regularizer = @tf.keras.regularizers.L2()
+tf.keras.regularizers.L2.l2 = %l2_reg
+
+callbacks = []
+
+epochs = 100
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+lr = 1e-2
+l2_reg = 0
+spectral_size = 256
+hidden_units = (512,)
+embedding_dim = 16
+dropout_rate = 0
+batch_size = 1024
+
+use_all_train_edges = True

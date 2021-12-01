@@ -1,3 +1,4 @@
+"""Importing this adds graph_tf and graph_tf/config to gin config search path."""
 import os
 
 import gin

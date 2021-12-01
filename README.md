@@ -4,6 +4,20 @@
 
 Tensorflow implementation of graph networks
 
+## Installation
+
+```bash
+git clone https://github.com/jackd/graph-tf.git
+pip install -e graph-tf
+```
+
+Benchmarks require [tfbm](https://github.com/jackd/tfbm)
+
+```bash
+git clone https://github.com/jackd/tfbm.git
+pip install -e tfbm
+```
+
 ## Pre-commit
 
 This package uses [pre-commit](https://pre-commit.com/) to ensure commits meet minimum criteria. To Install, use

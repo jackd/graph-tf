@@ -1,0 +1,37 @@
+import graph_tf.config
+import graph_tf.configurables
+import graph_tf.projects.isgae.models
+import graph_tf.projects.isgae.train
+import graph_tf.utils.experiment_callbacks
+
+gacl.main.fun = @gtf.isgae.iterative_build_and_fit
+gacl.main.callbacks = %experiment_callbacks
+
+gtf.isgae.iterative_build_and_fit.data = %data
+gtf.isgae.iterative_build_and_fit.encoder_fn = %encoder_fn
+gtf.isgae.iterative_build_and_fit.optimizer = %optimizer
+gtf.isgae.iterative_build_and_fit.loss = %loss
+gtf.isgae.iterative_build_and_fit.metrics = %metrics
+gtf.isgae.iterative_build_and_fit.weighted_metrics = %weighted_metrics
+gtf.isgae.iterative_build_and_fit.callbacks = %callbacks
+gtf.isgae.iterative_build_and_fit.epochs = %epochs
+gtf.isgae.iterative_build_and_fit.validation_freq = %validation_freq
+gtf.isgae.iterative_build_and_fit.verbose = %verbose
+gtf.isgae.iterative_build_and_fit.log_dir = %tb_dir
+gtf.isgae.iterative_build_and_fit.iterations = %fit_iterations
+
+experiment_callbacks = [
+    @gtf.utils.experiment_callbacks.TensorflowSeedSetter(),
+    @gacl.callbacks.GinConfigLogger(),
+]
+gtf.utils.experiment_callbacks.TensorflowSeedSetter.seed = %seed
+
+seed = 0
+metrics = None
+weighted_metrics = None
+callbacks = []
+validation_freq = 1
+verbose = True
+tb_dir = None
+epochs = 200
+fit_iterations = 20

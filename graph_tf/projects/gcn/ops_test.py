@@ -32,7 +32,7 @@ class GcnOpsTest(tf.test.TestCase, parameterized.TestCase):
             x, adjacency, kernel, sparse_impl, transform_first=False
         )
         first, second = self.evaluate((first, second))
-        np.testing.assert_allclose(first, second, rtol=1e-5)
+        np.testing.assert_allclose(first, second, rtol=1e-5, atol=1e-5)
 
     @parameterized.parameters(
         ops.multi_graph_conv_v0, ops.multi_graph_conv_v1, ops.multi_graph_conv_v2
@@ -44,11 +44,11 @@ class GcnOpsTest(tf.test.TestCase, parameterized.TestCase):
         coo1 = fn(*args, sparse_impl="coo", transform_first=True)
 
         coo2 = fn(*args, sparse_impl="coo", transform_first=False)
-        np.testing.assert_allclose(*self.evaluate((coo1, coo2)), rtol=1e-5)
+        np.testing.assert_allclose(*self.evaluate((coo1, coo2)), rtol=2e-5)
         csr1 = fn(*args, sparse_impl="csr", transform_first=True)
-        np.testing.assert_allclose(*self.evaluate((coo1, csr1)), rtol=1e-5)
+        np.testing.assert_allclose(*self.evaluate((coo1, csr1)), rtol=2e-5)
         csr2 = fn(*args, sparse_impl="csr", transform_first=False)
-        np.testing.assert_allclose(*self.evaluate((coo1, csr2)), rtol=1e-5)
+        np.testing.assert_allclose(*self.evaluate((coo1, csr2)), rtol=2e-5)
 
     def test_multi_graph_versions_consistent(self):
         # ensure different versions are consistent
@@ -57,8 +57,8 @@ class GcnOpsTest(tf.test.TestCase, parameterized.TestCase):
         v1 = ops.multi_graph_conv_v1(*args)
         v2 = ops.multi_graph_conv_v2(*args)
 
-        np.testing.assert_allclose(*self.evaluate((v0, v1)), rtol=1e-5)
-        np.testing.assert_allclose(*self.evaluate((v0, v2)), rtol=1e-5)
+        np.testing.assert_allclose(*self.evaluate((v0, v1)), rtol=2e-5)
+        np.testing.assert_allclose(*self.evaluate((v0, v2)), rtol=2e-5)
 
 
 if __name__ == "__main__":

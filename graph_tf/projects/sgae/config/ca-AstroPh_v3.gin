@@ -1,0 +1,3 @@
+include "sgae/config/_v3.gin"
+
+problem = "ca-AstroPh"

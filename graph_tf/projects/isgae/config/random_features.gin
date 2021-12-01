@@ -1,0 +1,6 @@
+import graph_tf.data.single
+
+features_transform = @gtf.data.random_features
+gtf.data.random_features.size = %random_size
+
+random_size = 64

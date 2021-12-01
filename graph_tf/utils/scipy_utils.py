@@ -5,7 +5,7 @@ import scipy.sparse as sp
 from scipy.sparse.linalg.eigen.arpack import eigsh
 
 
-def renormalize_sparse(A: sp.spmatrix) -> sp.spmatrix:
+def normalize_sparse(A: sp.spmatrix) -> sp.spmatrix:
     """Get (D**-0.5) * A * (D ** -0.5), where D is the diagonalized row sum."""
     A = sp.coo_matrix(A)
     A.eliminate_zeros()
@@ -30,7 +30,7 @@ def chebyshev_polynomials(A: sp.spmatrix, k: int) -> Sequence[sp.spmatrix]:
         k+1 sparse matrices
     """
 
-    A = renormalize_sparse(A)
+    A = normalize_sparse(A)
     N = A.shape[0]
     laplacian = sp.eye(N) - A
     largest_eigval, _ = eigsh(laplacian, 1, which="LM")
