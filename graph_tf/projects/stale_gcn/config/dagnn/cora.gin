@@ -1,0 +1,6 @@
+include 'gtf_config/data/citations/cora.gin'
+include 'stale_gcn/config/dagnn/_base.gin'
+
+weight_decay = 5e-3
+dropout_rate = 0.8
+num_propagations = 10

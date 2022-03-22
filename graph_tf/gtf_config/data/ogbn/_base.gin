@@ -1,0 +1,9 @@
+import graph_tf.data.single
+
+include "gtf_config/data/classification.gin"
+
+base_data = @gtf.data.ogbn_data()
+gtf.data.ogbn_data.name = %problem
+gtf.data.ogbn_data.make_symmetric = %make_symmetric
+
+make_symmetric = True

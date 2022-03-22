@@ -1,0 +1,62 @@
+import graph_tf.configurables
+import graph_tf.data.single
+import graph_tf.data.transforms
+import graph_tf.projects.cnet.data
+import graph_tf.projects.cnet.models
+
+model_fn = @gtf.cnet.base_model
+gtf.cnet.base_model.num_classes = %num_classes
+gtf.cnet.base_model.dropout_rate = %dropout_rate
+gtf.cnet.base_model.l2_reg = %l2_reg
+gtf.cnet.base_model.units = %units
+gtf.cnet.base_model.hidden_layers = %hidden_layers
+
+data = @gtf.cnet.data.preprocess_single()
+gtf.cnet.data.preprocess_single.data = %base_data
+gtf.cnet.data.preprocess_single.batch_size = %batch_size
+gtf.cnet.data.preprocess_single.features_transform = %features_transform
+gtf.cnet.data.preprocess_single.transition_transform = %transition_transform
+gtf.cnet.data.preprocess_single.max_iter = %max_iter
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+
+gtf.data.transforms.to_format.fmt = %fmt
+fmt = "dense"
+
+transition_transform = [
+    @gtf.data.transforms.row_normalize,
+    @gtf.data.transforms.add_identity,
+]
+# transition_transform = [
+#     @gtf.data.transforms.add_identity,
+#     @gtf.data.transforms.normalize_symmetric,
+# ]
+
+callbacks = [
+    @tf.keras.callbacks.EarlyStopping(),
+    @tf.keras.callbacks.TerminateOnNaN(),
+]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+patience = 100
+epochs = 2000
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+monitor = 'val_cross_entropy'
+lr = 1e-2
+l2_reg = 2.5e-4
+dropout_rate = 0.8
+units = 32
+hidden_layers = 1
+batch_size = 256
+max_iter = 1000
+
+dropout_rate = 0.8
+# l2_reg = 0

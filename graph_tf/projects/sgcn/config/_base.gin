@@ -1,0 +1,72 @@
+import graph_tf.configurables
+import graph_tf.data.transforms
+import graph_tf.projects.sgcn.data
+import graph_tf.projects.sgcn.models
+
+include "gtf_config/data/classification_single.gin"
+adjacency_transform = None
+
+data/gin.singleton.constructor = @gtf.sgcn.data.preprocess_single
+gtf.sgcn.data.preprocess_single.data = %base_data
+gtf.sgcn.data.preprocess_single.largest_component_only = %largest_component_only
+gtf.sgcn.data.preprocess_single.num_eigs = %num_eigs
+gtf.sgcn.data.preprocess_single.features_transform = %features_transform
+gtf.sgcn.data.preprocess_single.eigenvalue_transform = %eigenvalue_transform
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+
+eigenvalue_transform = (
+    @gtf.sgcn.data.add,
+    @gtf.sgcn.data.reciprocal,
+)
+gtf.sgcn.data.add.y = %shift
+
+gtf.data.transforms.to_format.fmt = "dense"
+
+model_fn = @gtf.sgcn.sgcn
+
+gtf.sgcn.sgcn.hidden_filters = %filters
+gtf.sgcn.sgcn.dropout_rate = %dropout_rate
+gtf.sgcn.sgcn.kernel_transform_fn = @gtf.sgcn.transform_kernel
+gtf.sgcn.sgcn.num_classes = %num_classes
+gtf.sgcn.sgcn.residual_connections = %residual_connections
+gtf.sgcn.sgcn.l2_reg = %l2_reg
+gtf.sgcn.sgcn.separable = %separable
+
+gtf.sgcn.transform_kernel.l2_reg = %l2_reg
+gtf.sgcn.transform_kernel.dropout_rate = %kernel_dropout_rate
+gtf.sgcn.transform_kernel.hidden_units = %kernel_units
+
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+patience = 10
+epochs = 200
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+monitor = 'val_cross_entropy'
+
+lr = 1e-2
+l2_reg = 2.5e-4
+num_eigs = 16
+filters = (16,)
+dropout_rate = 0.5
+kernel_dropout_rate = %dropout_rate
+residual_connections = False
+shift = 0.1
+separable = False
+kernel_units = ()
+
+patience = 100
+epochs = 2000
+filters = (64, 64)
+num_eigs = 128
+residual_connections = True
+separable = True

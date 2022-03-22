@@ -1,7 +1,10 @@
+import functools
 import typing as tp
 
 import gin
 import tensorflow as tf
+
+register = functools.partial(gin.register, module="gtf.utils.losses")
 
 
 class WeightedMeanLossWrapper(tf.keras.losses.Loss):
@@ -27,7 +30,7 @@ class WeightedMeanLossWrapper(tf.keras.losses.Loss):
         return config
 
 
-@gin.register(module="gtf.utils.losses")  # pylint: disable=too-few-public-methods
+@register  # pylint: disable=too-few-public-methods
 class WeightedMeanBinaryCrossentropy(WeightedMeanLossWrapper):
     def __init__(
         self,
@@ -39,7 +42,7 @@ class WeightedMeanBinaryCrossentropy(WeightedMeanLossWrapper):
         )
 
 
-@gin.register(module="gtf.utils.losses")
+@register
 class WeightedMeanSparseCategoricalCrossentropy(WeightedMeanLossWrapper):
     def __init__(
         self,

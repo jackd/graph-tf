@@ -1,0 +1,51 @@
+import graph_tf.configurables
+import graph_tf.data.single
+import graph_tf.data.transforms
+import graph_tf.projects.gcn2.models
+
+include "gtf_config/data/classification_single.gin"
+
+adjacency_transform = [
+    @gtf.data.transforms.add_identity,
+    @gtf.data.transforms.normalize_symmetric,
+]
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+
+gtf.data.transforms.to_format.fmt = "dense"
+
+model_fn = @gtf.gcn2.gcn2
+
+gtf.gcn2.gcn2.num_hidden_layers = %num_hidden_layers
+gtf.gcn2.gcn2.filters = %filters
+gtf.gcn2.gcn2.variant = %variant
+gtf.gcn2.gcn2.num_classes = %num_classes
+gtf.gcn2.gcn2.lam = %lam
+gtf.gcn2.gcn2.dropout_rate = %dropout_rate
+gtf.gcn2.gcn2.dense_weight_decay = %dense_weight_decay
+gtf.gcn2.gcn2.conv_weight_decay = %conv_weight_decay
+
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+patience = 100
+epochs = 1500
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+monitor = 'val_cross_entropy'
+
+lr = 1e-2
+filters = 64
+num_hidden_layers = 64
+variant = False
+conv_weight_decay = 1e-2  # wd1 in original
+dense_weight_decay = 5e-4  # wd2 in original
+lam = 0.5
+dropout_rate = 0.6

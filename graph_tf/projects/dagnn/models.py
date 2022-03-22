@@ -4,7 +4,6 @@ import tensorflow as tf
 from graph_tf.projects.dagnn.layers import GatedSum
 from graph_tf.utils import torch_compat
 from graph_tf.utils.layers import Krylov
-from graph_tf.utils.type_specs import keras_input
 
 
 @gin.configurable(module="gtf.dagnn")
@@ -16,7 +15,7 @@ def dagnn_citations(
     num_propagations: int = 16,
     l2_reg: float = 0.0,
 ):
-    inputs = tf.nest.map_structure(keras_input, inputs_spec)
+    inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     if len(inputs) == 3:
         x, a, ids = inputs
     else:

@@ -1,0 +1,24 @@
+import graph_tf.projects.stale_gcn.train
+import graph_tf.utils.experiment_callbacks
+
+gacl.main.fun = @gtf.stale_gcn.train.fit_and_test
+gacl.main.callbacks = %experiment_callbacks
+
+experiment_callbacks = [
+    @gtf.utils.experiment_callbacks.TensorflowSeedSetter(),
+    @gacl.callbacks.GinConfigLogger(),
+]
+gtf.utils.experiment_callbacks.TensorflowSeedSetter.seed = %seed
+
+seed = 0
+
+gtf.stale_gcn.train.fit_and_test.trainer = %trainer
+gtf.stale_gcn.train.fit_and_test.verbose = %verbose
+gtf.stale_gcn.train.fit_and_test.epochs = %epochs
+gtf.stale_gcn.train.fit_and_test.initial_epoch = %initial_epoch
+gtf.stale_gcn.train.fit_and_test.callbacks = %callbacks
+
+callbacks = []
+epochs = 1
+initial_epoch = 0
+verbose = True

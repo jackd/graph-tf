@@ -7,7 +7,6 @@ import tensorflow as tf
 from graph_tf.projects.dfnet.cvx_opt import dfnets_coefficients_optimizer
 from graph_tf.projects.dfnet.layers import DFNetConv
 from graph_tf.utils.ops import normalize_sparse, sparse_negate
-from graph_tf.utils.type_specs import keras_input
 
 
 @gin.configurable(module="gtf.dfnet")
@@ -85,7 +84,7 @@ def dfnet(
     dropout_rate: float = 0.9,
     units: Iterable[int] = (8, 16, 32, 64, 128),
 ):
-    inputs = tf.nest.map_structure(keras_input, inputs_spec)
+    inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     if len(inputs) == 3:
         x0, adj, indices = inputs
     else:

@@ -11,7 +11,9 @@ gtf.data.preprocess_autoencoder_data.features_transform = %features_transform
 gtf.data.preprocess_autoencoder_data.largest_component_only = %largest_component_only
 gtf.data.preprocess_autoencoder_data.validation_frac = %validation_frac
 gtf.data.preprocess_autoencoder_data.test_frac = %test_frac
+gtf.data.preprocess_autoencoder_data.validation_edges_in_adj = %validation_edges_in_adj
 
 largest_component_only = False
 test_frac = 0.1
 validation_frac = 0.05
+validation_edges_in_adj = False

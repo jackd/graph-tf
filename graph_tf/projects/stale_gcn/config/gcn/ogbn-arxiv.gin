@@ -1,0 +1,11 @@
+include "gtf_config/data/ogbn/arxiv.gin"
+include "stale_gcn/config/gcn/_base.gin"
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+]
+
+epochs = 2000
+patience = 50
+hidden_filters = (128, 128)
+train_batch_size = 1024

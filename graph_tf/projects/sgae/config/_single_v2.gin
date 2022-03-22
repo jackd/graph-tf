@@ -1,0 +1,38 @@
+
+import graph_tf.configurables
+import graph_tf.data.transforms
+import graph_tf.projects.sgae
+
+include "sgae/config/_base.gin"
+include "sgae/config/_v2.gin"
+include "gtf_config/data/gae_single_v2.gin"
+
+data = @gtf.sgae.get_spectral_split_v2()
+gtf.sgae.get_spectral_split_v2.data = @gtf.data.preprocess_autoencoder_data_v2()
+gtf.sgae.get_spectral_split_v2.spectral_size = %spectral_size
+
+gtf.data.preprocess_autoencoder_data_v2.data = %base_data
+
+# adjacency_transform = [
+#     @gtf.data.transforms.add_identity,
+#     @gtf.data.transforms.normalize_symmetric,
+# ]
+# gtf.sgae.get_spectral_split_v2.which = 'LM'
+
+# adjacency_transform = @gtf.data.transforms.normalized_laplacian
+# adjacency_transform = @gtf.data.transforms.laplacian
+# gtf.sgae.get_spectral_split_v2.which = 'SM'
+
+adjacency_transform = @gtf.data.transforms.normalized_laplacian
+gtf.sgae.get_spectral_split.which = 'LM'
+gtf.data.transforms.normalized_laplacian.shift = -2
+
+features_transform = [
+    @gtf.data.transforms.row_normalize,
+    @gtf.data.transforms.to_format,
+]
+
+gtf.data.transforms.to_format.fmt = %fmt
+fmt = "dense"
+
+validation_edges_in_adj = False

@@ -1,2 +1,2 @@
 include "gtf_config/data/citations/cora.gin"
-include "sgae/config/_base.gin"
+include "sgae/config/_single_v2.gin"

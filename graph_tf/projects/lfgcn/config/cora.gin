@@ -1,0 +1,2 @@
+include 'gtf_config/data/citations/cora.gin'
+include 'lfgcn/config/_base.gin'

@@ -1,0 +1,11 @@
+include "gtf_config/data/ogbn/arxiv.gin"
+include "gcn/config/_base.gin"
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+]
+
+epochs = 2000
+patience = 100
+hidden_layers = 2
+units = 128

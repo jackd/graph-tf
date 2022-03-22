@@ -1,0 +1,18 @@
+include "gtf_config/data/gae.gin"
+
+data = @gtf.data.transformed()
+data/gtf.data.transformed.base = %base_data
+data/gtf.data.transformed.transforms = @gtf.data.preprocess_autoencoder_data_v2
+gtf.data.preprocess_autoencoder_data_v2.adjacency_transform = %adjacency_transform
+gtf.data.preprocess_autoencoder_data_v2.features_transform = %features_transform
+gtf.data.preprocess_autoencoder_data_v2.largest_component_only = %largest_component_only
+gtf.data.preprocess_autoencoder_data_v2.validation_frac = %validation_frac
+gtf.data.preprocess_autoencoder_data_v2.test_frac = %test_frac
+gtf.data.preprocess_autoencoder_data_v2.validation_edges_in_adj = %validation_edges_in_adj
+gtf.data.preprocess_autoencoder_data_v2.practical_neg_sample = %practical_neg_sample
+
+largest_component_only = False
+test_frac = 0.1
+validation_frac = 0.05
+validation_edges_in_adj = False
+practical_neg_sample = True

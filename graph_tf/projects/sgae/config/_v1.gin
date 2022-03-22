@@ -1,0 +1,9 @@
+import graph_tf.projects.sgae
+
+model_fn = @gtf.sgae.sgae
+gtf.sgae.sgae.encoder_fn = @gtf.utils.models.mlp
+gtf.sgae.sgae.variational = %variational
+gtf.sgae.sgae.kl_scale = %kl_scale
+
+gtf.sgae.get_output_size.embedding_dim = %embedding_dim
+gtf.sgae.get_output_size.variational = %variational

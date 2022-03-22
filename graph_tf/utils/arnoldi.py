@@ -166,8 +166,17 @@ def lanczos_iteration(
     return Q, d, l
 
 
-def ritz_embedding(laplacian: tf.SparseTensor, x0: tf.Tensor, output_size: int):
-    Q, d, l = lanczos_iteration(laplacian, x0, output_size)
+def ritz_embedding(
+    A: tf.SparseTensor, x0: tf.Tensor, output_size: int
+) -> Tuple[tf.Tensor, tf.Tensor]:
+    A.shape.assert_has_rank(2)
+    x0.shape.assert_has_rank(1)
+    x0 = tf.expand_dims(x0, axis=1)
+    Q, d, l = lanczos_iteration(A, x0, output_size)
+    Q = tf.squeeze(Q, axis=-1)
+    d = tf.squeeze(d, axis=-1)
+    l = tf.squeeze(l, axis=-1)[:-1]
+
     diags = tf.stack(
         (
             tf.pad(l, [[0, 1]]),  # pylint:disable=no-value-for-parameter
@@ -178,5 +187,5 @@ def ritz_embedding(laplacian: tf.SparseTensor, x0: tf.Tensor, output_size: int):
     )
     tri_diag = tf.linalg.LinearOperatorTridiag(diags, is_self_adjoint=True)
     vals, vecs = tf.linalg.eigh(tri_diag.to_dense())
-    ritz_features = tf.matmul(Q, vecs)
-    return ritz_features, vals
+    ritz_features = tf.matmul(Q[:, :-1], vecs)
+    return vals, ritz_features

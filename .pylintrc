@@ -18,6 +18,7 @@ disable=
     not-context-manager,
     arguments-differ,
     too-many-ancestors,
+    consider-using-f-string,
 
 [format]
 

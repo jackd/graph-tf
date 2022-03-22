@@ -7,7 +7,6 @@ from graph_tf.projects.gcn import layers as gcn_layers
 from graph_tf.utils.layers import SparseDropout
 from graph_tf.utils.ops import sparse_gather
 from graph_tf.utils.type_checks import is_sparse_tensor
-from graph_tf.utils.type_specs import keras_input
 
 
 @gin.configurable(module="gtf.gcn")
@@ -43,7 +42,7 @@ def gcn(
             x = layer_fn(filters, activation=activation, **kwargs)([x, adj])
         return x
 
-    inputs = tf.nest.map_structure(keras_input, inputs_spec)
+    inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     if len(inputs) == 3:
         features, adjacency, ids = inputs
     else:
@@ -59,6 +58,7 @@ def gcn(
         hidden_filters = (hidden_filters,)
 
     x = features
+    kernel_regularizer = tf.keras.regularizers.l2(l2_reg) if l2_reg else None
 
     for filters in hidden_filters:
         x = propagate(
@@ -66,10 +66,16 @@ def gcn(
             adjacency,
             filters,
             activation=activation,
-            kernel_regularizer=tf.keras.regularizers.l2(l2_reg) if l2_reg else None,
+            kernel_regularizer=kernel_regularizer,
         )
 
     if ids is not None:
         adjacency = tf.nest.map_structure(lambda a: sparse_gather(a, ids).st, adjacency)
-    outputs = propagate(x, adjacency, num_classes, activation=final_activation)
+    outputs = propagate(
+        x,
+        adjacency,
+        num_classes,
+        activation=final_activation,
+        # kernel_regularizer=kernel_regularizer,
+    )
     return tf.keras.Model(inputs, outputs)

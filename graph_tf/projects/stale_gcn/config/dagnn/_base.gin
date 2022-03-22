@@ -1,0 +1,68 @@
+include "stale_gcn/config/utils/trainer.gin"
+include "stale_gcn/config/utils/classification.gin"
+
+import gacl.configurables.operator
+import graph_tf.configurables
+import graph_tf.data.single
+import graph_tf.data.transforms
+import graph_tf.projects.stale_gcn.models
+import graph_tf.projects.stale_gcn.utils
+import graph_tf.utils.torch_compat
+
+data = @gin.singleton()
+data/gin.singleton.constructor = @gtf.data.preprocess_base
+gtf.data.preprocess_base.data = %base_data
+
+gtf.data.preprocess_base.features_transform = %features_transform
+gtf.data.preprocess_base.adjacency_transform = %adjacency_transform
+
+model_fn = @gtf.stale_gcn.dagnn
+
+gtf.stale_gcn.dagnn.num_classes = %num_classes
+gtf.stale_gcn.dagnn.hidden_size = %hidden_size
+gtf.stale_gcn.dagnn.dropout_rate = %dropout_rate
+gtf.stale_gcn.dagnn.num_propagations = %num_propagations
+gtf.stale_gcn.dagnn.l2_reg = 0  # use gradient_transformers instead
+
+scaled_weight_decay = @operator.mul()
+scaled_weight_decay/operator.mul.a = %weight_decay
+scaled_weight_decay/operator.mul.b = %batch_frac
+
+batch_frac = @operator.truediv()
+batch_frac/operator.truediv.a = %train_batch_size
+batch_frac/operator.truediv.b = @gtf.data.num_nodes()
+
+gtf.data.num_nodes.data = %data
+
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+tf.keras.optimizers.Adam.gradient_transformers = [@gtf.utils.weight_decay_transformer()]
+gtf.utils.weight_decay_transformer.weight_decay = %scaled_weight_decay
+
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+adjacency_transform = [
+    @gtf.data.transforms.add_identity,
+    @gtf.data.transforms.normalize_symmetric,
+]
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+
+gtf.data.transforms.to_format.fmt = "dense"
+
+cache = @gtf.stale_gcn.utils.get_temp_cache()
+variant = "dagnn"
+
+hidden_size = 64
+lr = 1e-2
+train_batch_size = 128
+monitor = 'val_cross_entropy'
+patience = 100
+epochs = 2000

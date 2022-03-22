@@ -1,8 +1,9 @@
+import functools
+import os
 import typing as tp
 from dataclasses import dataclass
 
 import gin
-import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import tensorflow as tf
@@ -11,7 +12,10 @@ import graph_tfds.graphs  # pylint: disable=unused-import
 import stfu.ops
 import tensorflow_datasets as tfds
 from graph_tf.data.types import DataSplit
+from graph_tf.utils.graph_utils import get_largest_component_indices
 from graph_tf.utils.ops import indices_to_mask, unique_ravelled
+
+register = functools.partial(gin.register, module="gtf.data")
 
 
 @dataclass
@@ -74,8 +78,14 @@ def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
         ids = table.lookup(ids)
         return tf.boolean_mask(ids, ids != default_value)
 
+    node_features = single.node_features
+    if isinstance(node_features, tf.SparseTensor):
+        node_features = stfu.ops.gather(node_features, indices, axis=0)
+    else:
+        node_features = (tf.gather(node_features, indices, axis=0),)
+
     return SemiSupervisedSingle(
-        tf.gather(single.node_features, indices, axis=0),
+        node_features,
         adj,
         tf.gather(single.labels, indices, axis=0),
         train_ids=lookup(single.train_ids),
@@ -84,18 +94,19 @@ def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
     )
 
 
-def get_largest_component(single: SemiSupervisedSingle):
-    # create nx graph
-    g = nx.Graph()
-    for u, v in single.edges.numpy():
-        g.add_edge(u, v)
-    if nx.is_connected(g):
-        return single
-
-    _, _, component = max(
-        ((len(c), i, c) for i, c in enumerate(nx.connected_components(g)))
+def get_largest_component(
+    single: SemiSupervisedSingle, directed: bool = True, connection="weak"
+):
+    indices = get_largest_component_indices(
+        single.adjacency, directed=directed, connection=connection
     )
-    return subgraph(single, tuple(component))
+    return subgraph(single, indices)
+
+
+def get_largest_component_autoencoder(
+    data: AutoencoderData, directed: bool = True, connection="weak"
+) -> AutoencoderData:
+    raise NotImplementedError("TODO")
 
 
 def preprocess_weights(ids: tf.Tensor, num_nodes, normalize: bool = True):
@@ -109,8 +120,13 @@ TensorTransform = tp.Callable[[tf.Tensor], tf.Tensor]
 SparseTensorTransform = tp.Callable[[tf.SparseTensor], tf.SparseTensor]
 
 
-@gin.configurable(module="gtf.data")
-def preprocess_classification_single(
+@register
+def num_nodes(data: SemiSupervisedSingle) -> int:
+    return data.adjacency.shape[0]
+
+
+@register
+def preprocess_base(
     data: SemiSupervisedSingle,
     largest_component_only: bool = False,
     features_transform: tp.Union[TensorTransform, tp.Iterable[TensorTransform]] = (),
@@ -121,7 +137,7 @@ def preprocess_classification_single(
     if largest_component_only:
         data = get_largest_component(data)
 
-    data = SemiSupervisedSingle(
+    return SemiSupervisedSingle(
         transformed(data.node_features, features_transform),
         transformed(data.adjacency, adjacency_transform),
         data.labels,
@@ -129,10 +145,27 @@ def preprocess_classification_single(
         data.validation_ids,
         data.test_ids,
     )
+
+
+@register
+def preprocess_classification_single(
+    data: SemiSupervisedSingle,
+    largest_component_only: bool = False,
+    features_transform: tp.Union[TensorTransform, tp.Iterable[TensorTransform]] = (),
+    adjacency_transform: tp.Union[
+        SparseTensorTransform, tp.Iterable[SparseTensorTransform]
+    ] = (),
+) -> DataSplit:
+    data = preprocess_base(
+        data,
+        largest_component_only=largest_component_only,
+        features_transform=features_transform,
+        adjacency_transform=adjacency_transform,
+    )
     return to_classification_split(data)
 
 
-@gin.configurable(module="gtf.data")
+@register
 def to_classification_split(data: SemiSupervisedSingle) -> DataSplit:
     num_nodes = tf.shape(data.node_features, out_type=tf.int64)[0]
 
@@ -148,27 +181,29 @@ def to_classification_split(data: SemiSupervisedSingle) -> DataSplit:
     )
 
 
-@gin.configurable(module="gtf.data")
+@register
 def to_autoencoder_split(data: AutoencoderData) -> DataSplit:
     features = data.features
     adjacency = data.adjacency
     inputs = adjacency if features is None else (features, adjacency)
 
-    def get_examples(labels, weights) -> tp.Iterable:
+    def get_examples(labels, weights) -> tp.Optional[tp.Iterable]:
         if weights is None:
             return None
         assert labels is not None
         example = inputs, labels, weights
         return (example,)
 
+    train_data = get_examples(data.train_labels, data.train_weights)
+    assert train_data is not None
     return DataSplit(
-        get_examples(data.train_labels, data.train_weights),
+        train_data,
         get_examples(data.true_labels, data.validation_weights),
         get_examples(data.true_labels, data.test_weights),
     )
 
 
-@gin.configurable(module="gtf.data")
+@register
 def transformed(base, transforms: tp.Union[tp.Callable, tp.Iterable[tp.Callable]]):
     if transforms is None:
         return base
@@ -195,7 +230,6 @@ def mask_test_edges(
         adj: scipy.sparse.coo_matrix adjacency matrix.
     """
     rng = np.random.default_rng(seed)
-    # rng = np.random  # HACK
 
     def sparse_to_tuple(sparse_mx):
         if not sp.isspmatrix_coo(sparse_mx):
@@ -313,11 +347,11 @@ def _get_train_labels_and_weights(
         tf.squeeze(train_labels, -1), pos_weight * train_weights, train_weights
     ) / float((num_nodes2 - num_edges) * 2)
     if remove_self_edges:
-        train_weights = tf.reshape(train_weights, (num_nodes, num_nodes))
         train_weights = tf.where(
-            tf.eye(num_nodes, dtype=bool), tf.zeros_like(train_weights), train_weights
+            tf.reshape(tf.eye(num_nodes, dtype=bool), (-1,)),
+            tf.zeros_like(train_weights),
+            train_weights,
         )
-        train_weights = tf.reshape(train_weights, (-1,))
     return train_labels, train_weights
 
 
@@ -337,7 +371,7 @@ def _edges_to_weights(dense_shape, *edges):
     return preprocess_weights(ids, np.prod(dense_shape))
 
 
-@gin.configurable(module="gtf.data")
+@register
 def preprocess_autoencoder_data(
     data: SemiSupervisedSingle,
     largest_component_only: bool = False,
@@ -349,11 +383,13 @@ def preprocess_autoencoder_data(
     validation_frac: float = 0.05,
     test_frac: float = 0.1,
     validation_edges_in_adj: bool = False,
+    remove_self_edges: bool = False,
 ) -> AutoencoderData:
     if seed is None:
         seed = tf.random.uniform(  # pylint: disable=unexpected-keyword-arg
             (), maxval=np.iinfo(np.int64).max, dtype=tf.int64
         ).numpy()
+    assert seed is not None
     if largest_component_only:
         data = get_largest_component(data)
     adj = data.adjacency
@@ -371,7 +407,13 @@ def preprocess_autoencoder_data(
         test_frac=test_frac,
         validation_edges_in_adj=validation_edges_in_adj,
     )
-
+    adj_train = adj_train.tocoo()
+    adj_train = tf.SparseTensor(
+        np.stack((adj_train.row, adj_train.col), axis=1),
+        tf.convert_to_tensor(adj_train.data, tf.float32),
+        dense_shape=adj_train.shape,
+    )
+    node_features = transformed(data.node_features, features_transform)
     true_labels = tf.reshape(
         tf.convert_to_tensor(np.asarray(adj_sp.todense()), dtype=tf.bool), (-1, 1)
     )
@@ -380,15 +422,10 @@ def preprocess_autoencoder_data(
     validation_weights = _edges_to_weights(adj.shape, val_edges, val_edges_false)
     test_weights = _edges_to_weights(adj.shape, test_edges, test_edges_false)
 
-    adj_train = adj_train.tocoo()
-    adj_train = tf.SparseTensor(
-        np.stack((adj_train.row, adj_train.col), axis=1),
-        tf.convert_to_tensor(adj_train.data, tf.float32),
-        dense_shape=adj_train.shape,
+    train_labels, train_weights = _get_train_labels_and_weights(
+        adj_train, remove_self_edges=remove_self_edges
     )
-    train_labels, train_weights = _get_train_labels_and_weights(adj_train)
     adj_train = transformed(adj_train, adjacency_transform)
-    node_features = transformed(data.node_features, features_transform)
     return AutoencoderData(
         node_features,
         adj_train,
@@ -400,22 +437,7 @@ def preprocess_autoencoder_data(
     )
 
 
-# class ProblemType:
-#     CLASSIFICATION = "classification"
-#     AUTOENCODER = "autoencoder"
-
-#     @classmethod
-#     def all(cls):
-#         return (cls.CLASSIFICATION, cls.AUTOENCODER)
-
-#     @classmethod
-#     def validate(cls, candidate: str):
-#         candidates = cls.all()
-#         if candidate not in candidates:
-#             raise KeyError(f"candidate '{candidate}' must be in {candidates}")
-
-
-@gin.configurable(module="gtf.data")
+@register
 def random_features(
     features_or_num_nodes: tp.Union[tf.Tensor, int], size: int,
 ):
@@ -426,7 +448,37 @@ def random_features(
     return tf.random.normal((num_nodes, size))
 
 
-@gin.configurable(module="gtf.data")
+def _get_dir(data_dir: tp.Optional[str], environ: str, default: tp.Optional[str]):
+    if data_dir is None:
+        data_dir = os.environ.get(environ, default)
+    if data_dir is None:
+        return None
+    return os.path.expanduser(os.path.expandvars(data_dir))
+
+
+def _load_dgl_graph(dgl_example, make_symmetric=False) -> tf.SparseTensor:
+    r, c = (x.numpy() for x in dgl_example.edges())
+    shape = (dgl_example.num_nodes(),) * 2
+    if make_symmetric:
+        # add symmetric edges
+        r = np.array(r, dtype=np.int64)
+        c = np.array(c, dtype=np.int64)
+        # remove diagonals
+        valid = r != c
+        r = r[valid]
+        c = c[valid]
+        r, c = np.concatenate((r, c)), np.concatenate((c, r))
+        i1d = np.ravel_multi_index((r, c), shape)
+        i1d = np.unique(i1d)  # also sorts
+        r, c = np.unravel_index(  # pylint: disable=unbalanced-tuple-unpacking
+            i1d, shape
+        )
+    return tf.SparseTensor(
+        tf.stack((r, c), axis=1), tf.ones(r.size, dtype=tf.float32), shape
+    )
+
+
+@register
 def citations_data(name: str = "cora") -> SemiSupervisedSingle:
     """
     Get semi-supervised citations data.
@@ -468,8 +520,69 @@ def citations_data(name: str = "cora") -> SemiSupervisedSingle:
     return out
 
 
-@gin.configurable(module="gtf.data")
-def asymproj_data_v2(name: str = "ca-AstroPh") -> AutoencoderDataV2:
+@register
+def ogbn_data(
+    name: str, data_dir: tp.Optional[str] = None, make_symmetric: bool = True,
+) -> SemiSupervisedSingle:
+    import ogb.nodeproppred  # pylint: disable=import-outside-toplevel
+
+    root_dir = _get_dir(data_dir, "OGB_DATA", "~/ogb")
+    if not name.startswith("ogbn-"):
+        name = f"ogbn-{name}"
+
+    print(f"Loading dgl ogbn-{name}...")
+    ds = ogb.nodeproppred.DglNodePropPredDataset(name, root=root_dir)
+    print("Got base data. Initial preprocessing...")
+    split_ids = ds.get_idx_split()
+    train_ids, validation_ids, test_ids = (
+        tf.convert_to_tensor(split_ids[n].numpy(), tf.int64)
+        for n in ("train", "valid", "test")
+    )
+    example, labels = ds[0]
+    feats = tf.convert_to_tensor(example.ndata["feat"], tf.float32)
+    labels = labels.numpy().squeeze(1)
+    labels[np.isnan(labels)] = -1
+    labels = tf.convert_to_tensor(labels, tf.int64)
+    graph = _load_dgl_graph(example, make_symmetric=make_symmetric)
+    print("Finished initial preprocessing")
+
+    data = SemiSupervisedSingle(
+        feats, graph, labels, train_ids, validation_ids, test_ids
+    )
+    print("num (nodes, edges, features):")
+    print(
+        data.node_features.shape[0],
+        data.adjacency.values.shape[0],
+        data.node_features.shape[1],
+    )
+    return data
+
+
+def pos_neg_to_edges(pos_indices, neg_indices, mean_weights=False):
+    indices = tf.concat((pos_indices, neg_indices), 0)
+    labels = tf.concat(
+        (
+            tf.ones((pos_indices.shape[0], 1), dtype=bool),
+            tf.zeros((neg_indices.shape[0], 1), dtype=bool),
+        ),
+        0,
+    )
+    if mean_weights:
+        n = labels.shape[0]
+        weights = tf.fill((n,), tf.constant(1 / n, dtype=tf.float32))
+    else:
+        weights = None
+    return EdgeData(indices, labels, weights)
+
+
+@register
+def asymproj_data_v2(
+    name: str = "ca-AstroPh",
+    features_fn: tp.Optional[tp.Callable[[int], tf.Tensor]] = None,
+    adjacency_transform: tp.Union[
+        SparseTensorTransform, tp.Iterable[SparseTensorTransform]
+    ] = (),
+) -> AutoencoderDataV2:
     example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
     train_pos = example["train_pos"]
     train_neg = example["train_neg"]
@@ -477,30 +590,22 @@ def asymproj_data_v2(name: str = "ca-AstroPh") -> AutoencoderDataV2:
     test_neg = example["test_neg"]
     n = example["num_nodes"]
 
-    def to_edges(pos_indices, neg_indices):
-        indices = tf.concat((pos_indices, neg_indices), 0)
-        labels = tf.concat(
-            (
-                tf.ones((pos_indices.shape[0], 1), dtype=bool),
-                tf.zeros((neg_indices.shape[0], 1), dtype=bool),
-            ),
-            0,
-        )
-        weights = None
-        return EdgeData(indices, labels, weights)
-
-    train_edges = to_edges(train_pos, train_neg)
-    test_edges = to_edges(test_pos, test_neg)
+    train_edges = pos_neg_to_edges(train_pos, train_neg, mean_weights=False)
+    test_edges = pos_neg_to_edges(test_pos, test_neg, mean_weights=False)
     validation_edges = None
 
     adjacency = tf.SparseTensor(train_pos, tf.ones((train_pos.shape[0],)), (n, n))
-    features = None
+    if features_fn is None:
+        features = None
+    else:
+        features = features_fn(n)
+    adjacency = transformed(adjacency, adjacency_transform)
     return AutoencoderDataV2(
         features, adjacency, train_edges, validation_edges, test_edges
     )
 
 
-@gin.configurable(module="gtf.data")
+@register
 def asymproj_data(
     name: str = "ca-AstroPh",
     symmetric: bool = True,
@@ -566,4 +671,166 @@ def asymproj_data(
         train_weights,
         None,
         test_weights,
+    )
+
+
+def split_edges_walk_pooling(
+    adj: sp.coo_matrix,
+    validation_frac: float = 0.05,
+    test_frac: float = 0.1,
+    seed: int = 0,
+    validation_edges_in_adj: bool = False,
+    practical_neg_sample: bool = True,
+):
+    """Split edges consistent with the method used in Walk Pooling."""
+    rng = np.random.default_rng(seed)
+
+    def random_perm(size, dtype=np.int64):
+        perm = np.arange(size, dtype=dtype)
+        rng.shuffle(perm)
+        return perm
+
+    row = adj.row
+    col = adj.col
+    mask = row < col
+    row, col = row[mask], col[mask]
+    num_edges = row.size
+    num_nodes = adj.shape[0]
+    n_v = int(validation_frac * num_edges)  # number of validation positive edges
+    n_t = int(test_frac * num_edges)  # number of test positive edges
+    # split positive edges
+    perm = random_perm(num_edges)
+    row, col = row[perm], col[perm]
+    r, c = row[:n_v], col[:n_v]
+    val_pos = np.stack([r, c], axis=1)
+    r, c = row[n_v : n_v + n_t], col[n_v : n_v + n_t]
+    test_pos = np.stack([r, c], axis=1)
+    r, c = row[n_v + n_t :], col[n_v + n_t :]
+    train_pos = np.stack([r, c], axis=1)
+
+    # sample negative edges
+    if practical_neg_sample:
+        neg_adj_mask = np.ones((num_nodes, num_nodes), dtype=bool)
+        neg_adj_mask = np.triu(neg_adj_mask, 1)
+        neg_adj_mask[row, col] = 0
+
+        # Sample the test negative edges first
+        neg_row, neg_col = np.where(neg_adj_mask)
+        perm = random_perm(neg_row.size)[:n_t]
+        neg_row, neg_col = neg_row[perm], neg_col[perm]
+        test_neg = np.stack([neg_row, neg_col], axis=1)
+
+        # Sample the train and val negative edges with only knowing
+        # the train positive edges
+        row, col = train_pos.T
+        neg_adj_mask = np.ones((num_nodes, num_nodes), dtype=bool)
+        neg_adj_mask = np.triu(neg_adj_mask, 1)
+        neg_adj_mask[row, col] = 0
+
+        # Sample the train and validation negative edges
+        neg_row, neg_col = np.where(neg_adj_mask)
+        n_tot = n_v + train_pos.size
+        perm = random_perm(neg_row.size)[:n_tot]
+        neg_row, neg_col = neg_row[perm], neg_col[perm]
+
+        row, col = neg_row[:n_v], neg_col[:n_v]
+        val_neg = np.stack([row, col], axis=1)
+
+        row, col = neg_row[n_v:], neg_col[n_v:]
+        train_neg = np.stack([row, col], axis=1)
+
+    else:
+        # If practical_neg_sample == False, the sampled negative edges
+        # in the training and validation set aware the test set
+
+        neg_adj_mask = np.ones((num_nodes, num_nodes), dtype=bool)
+        neg_adj_mask = np.triu(neg_adj_mask, 1)
+        neg_adj_mask[row, col] = 0
+
+        # Sample all the negative edges and split into val, test, train negs
+        neg_row, neg_col = np.where(neg_adj_mask)
+        perm = random_perm(neg_row.size)[: row.size]
+        neg_row, neg_col = neg_row[perm], neg_col[perm]
+
+        row, col = neg_row[:n_v], neg_col[:n_v]
+        val_neg = np.stack([row, col], axis=1)
+
+        row, col = neg_row[n_v : n_v + n_t], neg_col[n_v : n_v + n_t]
+        test_neg = np.stack([row, col], axis=1)
+
+        row, col = neg_row[n_v + n_t :], neg_col[n_v + n_t :]
+        train_neg = np.stack([row, col], axis=1)
+
+    pos = (
+        np.concatenate((train_pos, val_pos), axis=0)
+        if validation_edges_in_adj
+        else train_pos
+    )
+    adj_train = sp.coo_matrix(
+        (np.ones((pos.shape[0],), dtype=np.float32), pos.T), shape=adj.shape
+    )
+    adj_train = adj_train + adj_train.T
+    return (
+        adj_train,
+        train_pos,
+        train_neg,
+        val_pos,
+        val_neg,
+        test_pos,
+        test_neg,
+    )
+
+
+@register
+def preprocess_autoencoder_data_v2(
+    data: SemiSupervisedSingle,
+    largest_component_only: bool = False,
+    features_transform: tp.Union[TensorTransform, tp.Iterable[TensorTransform]] = (),
+    adjacency_transform: tp.Union[
+        SparseTensorTransform, tp.Iterable[SparseTensorTransform]
+    ] = (),
+    seed: tp.Optional[int] = None,
+    validation_frac: float = 0.05,
+    test_frac: float = 0.1,
+    validation_edges_in_adj: bool = False,
+    practical_neg_sample: bool = True,
+) -> AutoencoderDataV2:
+    if seed is None:
+        seed = tf.random.uniform(  # pylint: disable=unexpected-keyword-arg
+            (), maxval=np.iinfo(np.int64).max, dtype=tf.int64
+        ).numpy()
+    assert seed is not None
+    if largest_component_only:
+        data = get_largest_component(data)
+    adj = data.adjacency
+    adj_sp = sp.coo_matrix((adj.values.numpy(), adj.indices.numpy().T), shape=adj.shape)
+    (
+        adj_train,
+        train_pos,
+        train_neg,
+        val_pos,
+        val_neg,
+        test_pos,
+        test_neg,
+    ) = split_edges_walk_pooling(
+        adj_sp,
+        seed=seed,
+        validation_frac=validation_frac,
+        test_frac=test_frac,
+        validation_edges_in_adj=validation_edges_in_adj,
+        practical_neg_sample=practical_neg_sample,
+    )
+    adj_train = adj_train.tocoo()
+    adj_train = tf.SparseTensor(
+        np.stack((adj_train.row, adj_train.col), axis=1),
+        tf.convert_to_tensor(adj_train.data, tf.float32),
+        dense_shape=adj_train.shape,
+    )
+
+    return AutoencoderDataV2(
+        transformed(data.node_features, features_transform),
+        transformed(adj_train, adjacency_transform),
+        pos_neg_to_edges(train_pos, train_neg, True),
+        pos_neg_to_edges(val_pos, val_neg, True),
+        pos_neg_to_edges(test_pos, test_neg, True),
     )

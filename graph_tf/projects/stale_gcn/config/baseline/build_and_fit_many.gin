@@ -1,0 +1,8 @@
+import graph_tf.data.single
+
+include "gtf_config/build_and_fit_many.gin"
+
+gtf.build_and_fit.data = @gtf.data.to_classification_split()
+gtf.data.to_classification_split.data = %data
+
+batch_frac = 1

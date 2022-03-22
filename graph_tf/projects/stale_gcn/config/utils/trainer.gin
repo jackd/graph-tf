@@ -1,0 +1,17 @@
+import graph_tf.projects.stale_gcn.train
+
+trainer = @gtf.stale_gcn.train.StaleTrainer()
+
+gtf.stale_gcn.train.StaleTrainer.data = %data
+gtf.stale_gcn.train.StaleTrainer.model_fn = %model_fn
+gtf.stale_gcn.train.StaleTrainer.cache = %cache
+gtf.stale_gcn.train.StaleTrainer.train_batch_size = %train_batch_size
+gtf.stale_gcn.train.StaleTrainer.cache_batch_size = %cache_batch_size
+gtf.stale_gcn.train.StaleTrainer.optimizer = %optimizer
+gtf.stale_gcn.train.StaleTrainer.loss = %loss
+gtf.stale_gcn.train.StaleTrainer.metrics = %metrics
+gtf.stale_gcn.train.StaleTrainer.weighted_metrics = %weighted_metrics
+gtf.stale_gcn.train.StaleTrainer.use_dense_adjacency = %use_dense_adjacency
+
+cache_batch_size = -1
+use_dense_adjacency = False

@@ -1,0 +1,81 @@
+import gacl.configurables.operator
+import graph_tf.configurables
+import graph_tf.data.single
+import graph_tf.data.transforms
+import graph_tf.projects.stale_gcn.gcn2
+import graph_tf.projects.stale_gcn.utils
+
+include "stale_gcn/config/utils/trainer.gin"
+include "stale_gcn/config/utils/classification.gin"
+
+data = @gin.singleton()
+data/gin.singleton.constructor = @gtf.data.preprocess_base
+gtf.data.preprocess_base.data = %base_data
+
+gtf.data.preprocess_base.features_transform = %features_transform
+gtf.data.preprocess_base.adjacency_transform = %adjacency_transform
+
+model_fn = @gtf.stale_gcn.gcn2
+
+gtf.stale_gcn.gcn2.num_hidden_layers = %num_hidden_layers
+gtf.stale_gcn.gcn2.filters = %filters
+gtf.stale_gcn.gcn2.variant = %variant
+gtf.stale_gcn.gcn2.num_classes = %num_classes
+gtf.stale_gcn.gcn2.lam = %lam
+gtf.stale_gcn.gcn2.dropout_rate = %dropout_rate
+gtf.stale_gcn.gcn2.dense_weight_decay = %dense_weight_decay_scaled
+gtf.stale_gcn.gcn2.conv_weight_decay = %conv_weight_decay_scaled
+
+dense_weight_decay_scaled = @operator.mul()
+dense_weight_decay_scaled/operator.mul.a = %dense_weight_decay
+dense_weight_decay_scaled/operator.mul.b = %batch_frac
+
+conv_weight_decay_scaled = @operator.mul()
+conv_weight_decay_scaled/operator.mul.a = %conv_weight_decay
+conv_weight_decay_scaled/operator.mul.b = %batch_frac
+
+batch_frac = @operator.truediv()
+batch_frac/operator.truediv.a = %train_batch_size
+batch_frac/operator.truediv.b = @gtf.data.num_nodes()
+
+gtf.data.num_nodes.data = %data
+
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+adjacency_transform = [
+    @gtf.data.transforms.add_identity,
+    @gtf.data.transforms.normalize_symmetric,
+]
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+
+gtf.data.transforms.to_format.fmt = "dense"
+
+# cache = @gtf.stale_gcn.utils.get_temp_cache()
+cache = None  # in memory cache
+variant = "gcn2"
+
+monitor = 'val_cross_entropy'
+
+lr = 1e-2
+filters = 64
+num_hidden_layers = 64
+variant = False
+conv_weight_decay = 1e-2  # wd1 in original
+dense_weight_decay = 5e-4  # wd2 in original
+lam = 0.5
+dropout_rate = 0.6
+
+patience = 100
+epochs = 1500
+train_batch_size = 128

@@ -26,6 +26,14 @@ class InfiniteDataset:
         return self._steps_per_epoch
 
 
+def first(iterable: Iterable):
+    it = iter(iterable)
+    try:
+        return next(it)
+    except StopIteration as e:
+        raise ValueError("iterable must have at least one entry") from e
+
+
 @gin.configurable(module="gtf")
 def build_and_fit(
     data: DataSplit,
@@ -51,7 +59,7 @@ def build_and_fit(
     if isinstance(train_data, tf.data.Dataset):
         spec = train_data.element_spec[0]
     else:
-        spec = get_type_spec(train_data[0][0])
+        spec = get_type_spec(first(train_data)[0])
 
     model: tf.keras.Model = model_fn(spec)
     model.compile(
@@ -73,20 +81,31 @@ def build_and_fit(
         verbose=verbose,
         steps_per_epoch=steps_per_epoch,
     )
-    if test_data is None:
-        test_res = None
-    else:
-        if isinstance(test_data, tf.data.Dataset):
-            verbose = len(test_data) > 1
+
+    results = {}
+
+    def evaluate(data):
+        if isinstance(data, tf.data.Dataset):
+            verbose = len(data) > 1
         else:
             verbose = False
-            test_data = tf.data.Dataset.from_tensors(unpack(test_data))
-        test_res = model.evaluate(test_data, return_dict=True, verbose=verbose)
-        print("Results on test data:")
-        width = max(len(k) for k in test_res.keys()) + 1
-        for k in sorted(test_res):
-            print(f"{k.ljust(width)}: {test_res[k]}")
-    return model, history, test_res
+            data = tf.data.Dataset.from_tensors(unpack(data))
+        return model.evaluate(data, return_dict=True, verbose=verbose)
+
+    def print_results(results):
+        width = max(len(k) for k in results) + 1
+        for k in sorted(results):
+            print(f"{k.ljust(width)}: {results[k]}")
+
+    if validation_data is not None:
+        val_res = evaluate(validation_data)
+        results.update({f"val_{k}": v for k, v in val_res.items()})
+    if test_data is not None:
+        test_res = evaluate(test_data)
+        results.update({f"test_{k}": v for k, v in test_res.items()})
+    print("Final results")
+    print_results(results)
+    return model, history, results
 
 
 @gin.configurable(module="gtf")

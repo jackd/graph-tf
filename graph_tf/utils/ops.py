@@ -39,7 +39,7 @@ class SparseImplementation:
 
 
 def to_sparse_impl(
-    sp: Union[tf.SparseTensor, CSRSparseMatrix], impl: SparseImplementation
+    sp: Union[tf.SparseTensor, CSRSparseMatrix], impl: str
 ) -> Union[tf.SparseTensor, CSRSparseMatrix]:
     SparseImplementation.validate(impl)
     if impl == SparseImplementation.COO:
@@ -68,14 +68,17 @@ def to_csr(st: Union[tf.SparseTensor, CSRSparseMatrix]) -> CSRSparseMatrix:
 def matmul(
     a: Union[tf.Tensor, tf.SparseTensor, CSRSparseMatrix],
     b: Union[tf.Tensor, CSRSparseMatrix],
+    transpose_a: bool = False,
+    transpose_b: bool = False,
 ):
+    kwargs = dict(transpose_a=transpose_a, transpose_b=transpose_b)
     if is_dense_tensor(a):
         assert is_dense_tensor(b)
-        return tf.matmul(a, b)
+        return tf.matmul(a, b, **kwargs)
     if is_dense_tensor(b):
-        return sparse_dense_matmul(a, b)
+        return sparse_dense_matmul(a, b, **kwargs)
     if is_csr_matrix(b):
-        return sparse_sparse_matmul(a, b)
+        return sparse_sparse_matmul(a, b, **kwargs)
     raise TypeError(f"b must be a Tensor or CSRSparseMatrix, got {b}")
 
 
@@ -96,21 +99,35 @@ def sparse_stack(sp_inputs: Sequence[tf.SparseTensor], axis: int = 0):
     return tf.sparse.concat(sp_inputs=sp_inputs, axis=axis)
 
 
-def sparse_dense_matmul(a: Union[tf.SparseTensor, CSRSparseMatrix], b: tf.Tensor):
+def sparse_dense_matmul(
+    a: Union[tf.SparseTensor, CSRSparseMatrix],
+    b: tf.Tensor,
+    transpose_a: bool = False,
+    transpose_b: bool = False,
+) -> tf.Tensor:
     if is_sparse_tensor(a):
-        return tf.sparse.sparse_dense_matmul(a, b)
+        assert a.dtype.real_dtype == a.dtype, a.dtype
+
+        return tf.sparse.sparse_dense_matmul(
+            a, b, adjoint_a=transpose_a, adjoint_b=transpose_b
+        )
 
     if is_csr_matrix(a):
-        return sparse_lib.matmul(a, b)
+        return sparse_lib.matmul(a, b, transpose_a=transpose_a, transpose_b=transpose_b)
 
     raise TypeError(f"a must be SparseTensor or CSRSparseMatrix, got {a}")
 
 
-def sparse_sparse_matmul(a: CSRSparseMatrix, b: CSRSparseMatrix):
+def sparse_sparse_matmul(
+    a: CSRSparseMatrix,
+    b: CSRSparseMatrix,
+    transpose_a: bool = False,
+    transpose_b: bool = False,
+):
     """Sparse-sparse matrix multiplication using CSRSparseMatrix."""
     assert is_csr_matrix(a)
     assert is_csr_matrix(b)
-    return sparse_lib.matmul(a, b)
+    return sparse_lib.matmul(a, b, transpose_a=transpose_a, transpose_b=transpose_b)
 
 
 def _ravel_scalar(dense_shape, axis=0):
@@ -250,6 +267,7 @@ def sparse_dropout_rng(
 ):
     if rng is None:
         rng = tf.random.get_global_generator()
+    assert rng is not None
     return _sparse_dropout(x, rate, rng.uniform)
 
 
@@ -334,6 +352,9 @@ def _prepare_gather_mask_args(
     new_size = tf.size(indices, out_type=tf.int64)
     if mask is None:
         mask = scatter_1d(indices, tf.ones((new_size,), tf.bool), old_size)
+
+    assert indices is not None
+    assert mask is not None
     indices.shape.assert_has_rank(1)
     mask.shape.assert_has_rank(1)
 

@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from graph_tf.utils.arnoldi import arnoldi_iteration as arnoldi_iteration_tf
+from graph_tf.utils.arnoldi import ritz_embedding
 from graph_tf.utils.test_utils import random_sparse
 
 
@@ -141,6 +142,20 @@ class ArnoldiTest(tf.test.TestCase):
         self.assertAllClose(Q, Qs, atol=1e-4)
         self.assertAllClose(h, hs, atol=1e-4)
 
+    def test_ritz_completes(self):
+        m = 100
+        nnz = m * 10
+        n = 20
+
+        rng = tf.random.Generator.from_seed(0)
+        A = random_sparse((m, m), nnz, rng=rng)
+        A = tf.sparse.add(A, tf.sparse.transpose(A, (1, 0)))  # make symmetric
+        b = rng.normal((m,))
+
+        w, v = ritz_embedding(A, b, n)
+        del w, v
+
 
 if __name__ == "__main__":
-    tf.test.main()
+    # tf.test.main()
+    ArnoldiTest().test_ritz_completes()

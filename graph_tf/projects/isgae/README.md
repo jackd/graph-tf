@@ -13,6 +13,6 @@ python -m graph_tf isgae/config/mains/build_and_fit.gin \
     isgae/confi/random_features
 
 python -m graph_tf isgae/config/mains/build_and_fit.gin \
-isgae/config/ca-AstroPh.gin
+    isgae/config/ca-AstroPh.gin
 
 ```

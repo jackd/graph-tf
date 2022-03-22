@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 
 import tensorflow as tf
 
@@ -182,3 +182,42 @@ class Krylov(tf.keras.layers.Layer):
     def call(self, inputs):
         A, b = inputs
         return ops.krylov(A, b, dims=self.dims, axis=self.axis)
+
+
+class VariationalSampler(tf.keras.layers.Layer):
+    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
+
+    def __init__(
+        self,
+        kl_scale: float = 1.0,
+        reduction: Union[str, Callable] = tf.reduce_mean,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.kl_scale = kl_scale
+        if isinstance(reduction, str):
+            reduction = {
+                "mean": tf.reduce_mean,
+                "reduce_mean": tf.reduce_mean,
+                "sum": tf.reduce_sum,
+                "reduce_sum": tf.reduce_sum,
+            }[reduction.lower()]
+        else:
+            assert callable(reduction), reduction
+        self.reduction = reduction
+
+    def get_config(self):
+        config = super().get_config()
+        config["kl_scale"] = self.kl_scale
+        config["reduction"] = self.reduction.__name__
+        return config
+
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        epsilon = tf.keras.backend.random_normal(shape=tf.shape(z_mean))
+
+        kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
+        kl_loss = -0.5 * self.kl_scale * self.reduction(tf.reduce_sum(kl_loss, axis=-1))
+        self.add_loss(kl_loss, inputs=inputs)
+        self.add_metric(kl_loss, name="kl")
+        return z_mean + tf.exp(z_log_var / 2) * epsilon

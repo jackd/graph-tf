@@ -10,7 +10,6 @@ from graph_tf.data.single import (
     preprocess_node_features,
 )
 from graph_tf.utils import ops
-from graph_tf.utils.type_specs import keras_input
 
 
 @gin.configurable(module="gtf.sign")
@@ -61,7 +60,7 @@ def mlp(
     assert isinstance(inputs_spec, tf.TensorSpec)
     activation = tf.keras.activations.get(activation)
     kernel_regularizer = tf.keras.regularizers.l2(l2_reg) if l2_reg else None
-    inp = keras_input(inputs_spec, use_batch_size=False)
+    inp = lambda s: tf.keras.Input(type_spec=inputs_spec)
     x = inp
 
     for _ in range(num_hidden_layers):

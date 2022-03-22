@@ -2,7 +2,6 @@ import tensorflow as tf
 
 from graph_tf.projects.gat_v2 import layers as gat_layers
 from graph_tf.utils.ops import sparse_gather
-from graph_tf.utils.type_specs import keras_input
 
 
 def gat(
@@ -14,7 +13,7 @@ def gat(
     final_heads: int = 1,
     dropout_rate: float = 0.6,
 ):
-    inputs = tf.nest.map_structure(keras_input, inputs_spec)
+    inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     if len(inputs) == 3:
         x_in, a_in, ids = inputs
     else:

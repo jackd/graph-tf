@@ -1,0 +1,16 @@
+import graph_tf.configurables
+
+loss = @tf.keras.losses.SparseCategoricalCrossentropy()
+metrics = []
+weighted_metrics = [
+    @tf.keras.metrics.SparseCategoricalCrossentropy(),
+    @tf.keras.metrics.SparseCategoricalAccuracy(),
+]
+
+tf.keras.losses.SparseCategoricalCrossentropy.reduction = 'sum'
+tf.keras.losses.SparseCategoricalCrossentropy.from_logits = %from_logits
+tf.keras.metrics.SparseCategoricalCrossentropy.from_logits = %from_logits
+
+from_logits = True
+tf.keras.metrics.SparseCategoricalCrossentropy.name = 'cross_entropy'
+tf.keras.metrics.SparseCategoricalAccuracy.name = 'acc'

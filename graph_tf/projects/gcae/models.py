@@ -7,7 +7,6 @@ import tensorflow as tf
 from graph_tf.projects.gcn import layers as gcn_layers
 from graph_tf.utils.layers import SparseDropout
 from graph_tf.utils.type_checks import is_sparse_tensor
-from graph_tf.utils.type_specs import keras_input
 
 register = functools.partial(gin.register, module="gtf.gcae")
 
@@ -46,7 +45,7 @@ def gcae(
             x = graph_conv_factory(filters, activation=activation, **kwargs)([x, adj])
         return x
 
-    inputs = tf.nest.map_structure(keras_input, inputs_spec)
+    inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     x, adjacency = inputs
     graph_conv_factory = (
         gcn_layers.MultiGraphConvolution

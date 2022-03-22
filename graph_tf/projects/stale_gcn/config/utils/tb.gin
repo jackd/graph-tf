@@ -1,0 +1,12 @@
+stale_gcn.train.get_log_dir.variant = %variant
+stale_gcn.train.get_log_dir.problem = %problem
+stale_gcn.train.get_log_dir.batch_size = %train_batch_size
+
+log_dir = @stale_gcn.train.get_log_dir()
+
+callbacks = [
+    @tf.keras.callbacks.EarlyStopping(),
+    @tf.keras.callbacks.TensorBoard(),
+]
+
+tf.keras.callbacks.TensorBoard.log_dir = %log_dir

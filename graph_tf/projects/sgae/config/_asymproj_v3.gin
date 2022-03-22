@@ -25,8 +25,12 @@ adjacency_transform = [
 
 model_fn = @gtf.sgae.sgae_v3
 gtf.sgae.sgae_v3.encoder_fn = @gtf.utils.models.mlp
+gtf.sgae.sgae_v3.variational = %variational
 
-gtf.utils.models.mlp.output_units = %embedding_dim
+gtf.sgae.get_output_size.embedding_dim = %embedding_dim
+gtf.sgae.get_output_size.variational = %variational
+
+gtf.utils.models.mlp.output_units = @gtf.sgae.get_output_size()
 gtf.utils.models.mlp.hidden_units = %hidden_units
 gtf.utils.models.mlp.dropout_rate = %dropout_rate
 gtf.utils.models.mlp.dense_fn = @gtf.utils.models.dense
@@ -49,3 +53,4 @@ dropout_rate = 0
 batch_size = 1024
 
 use_all_train_edges = True
+variational = False

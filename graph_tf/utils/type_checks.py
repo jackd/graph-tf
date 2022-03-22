@@ -7,6 +7,7 @@ def is_dense_tensor(x) -> bool:
         or tf.is_tensor(x)
         and tf.keras.backend.is_keras_tensor(x)
         and isinstance(x.type_spec, tf.TensorSpec)
+        or isinstance(x, tf.Variable)
     )
 
 

@@ -1,0 +1,8 @@
+include "stale_gcn/config/fit_and_test.gin"
+
+gtf.stale_gcn.train.fit_and_test_many.repeats = %repeats
+gtf.stale_gcn.train.fit_and_test_many.seed = %seed
+gacl.main.fun = @gtf.stale_gcn.train.fit_and_test_many
+
+seed = 0
+repeats = 10

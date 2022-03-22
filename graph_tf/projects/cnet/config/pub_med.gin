@@ -1,0 +1,2 @@
+include 'gtf_config/data/citations/pub_med.gin'
+include 'cnet/config/_base.gin'

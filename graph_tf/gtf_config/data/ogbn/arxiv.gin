@@ -1,0 +1,4 @@
+include "gtf_config/data/ogbn/_base.gin"
+
+problem = "ogbn-arxiv"
+num_classes = 40
