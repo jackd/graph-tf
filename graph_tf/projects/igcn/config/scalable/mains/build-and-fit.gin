@@ -1,0 +1,42 @@
+import graph_tf.data.single
+import graph_tf.utils.models
+import graph_tf.utils.torch_compat
+include "igcn/config/scalable/mains/prepare-cache.gin"
+include "gtf_config/data/classification.gin"
+
+gacl.main.fun = @gtf.igcn.scalable.build_and_fit
+gtf.igcn.scalable.build_and_fit.cache = @gtf.igcn.scalable.prepare_cache()
+
+gtf.igcn.scalable.build_and_fit.batch_size = %batch_size
+gtf.igcn.scalable.build_and_fit.epsilon = %epsilon
+gtf.igcn.scalable.build_and_fit.mlp_fn = %mlp_fn
+gtf.igcn.scalable.build_and_fit.optimizer = %optimizer
+gtf.igcn.scalable.build_and_fit.loss = %loss
+gtf.igcn.scalable.build_and_fit.weighted_metrics = %weighted_metrics
+gtf.igcn.scalable.build_and_fit.callbacks = %callbacks
+gtf.igcn.scalable.build_and_fit.epochs = %epochs
+gtf.igcn.scalable.build_and_fit.features_transform = %features_transform
+gtf.igcn.scalable.build_and_fit.temperature = %temperature
+
+temperature = %INF
+
+mlp_fn = @gtf.utils.models.mlp
+gtf.utils.models.mlp.output_units = %num_classes
+gtf.utils.models.mlp.hidden_units = %hidden_units
+gtf.utils.models.mlp.dropout_rate = %dropout_rate
+
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
+gradient_transformers = [
+    @gtf.utils.weight_decay_transformer()
+]
+
+gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+monitor = 'val_cross_entropy'

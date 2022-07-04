@@ -1,0 +1,10 @@
+data_fn = @gtf.igcn.data.get_batched_logit_propagated_split
+gtf.igcn.data.get_batched_logit_propagated_split.data = %preprocessed_data
+gtf.igcn.data.get_batched_logit_propagated_split.laplacian_fn = %laplacian_fn
+gtf.igcn.data.get_batched_logit_propagated_split.batch_size = %batch_size
+gtf.igcn.data.get_batched_logit_propagated_split.always_include_train_ids = %always_include_train_ids
+gtf.igcn.data.get_batched_logit_propagated_split.max_iter = %max_iter
+
+batch_size = 512
+always_include_train_ids = True
+# always_include_train_ids = False

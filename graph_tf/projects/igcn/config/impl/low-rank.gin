@@ -1,0 +1,7 @@
+train_propagator_fn = @gtf.igcn.data.low_rank_inverse_approx
+validation_propagator_fn = @gtf.igcn.data.low_rank_inverse_approx
+test_propagator_fn = @gtf.igcn.data.low_rank_inverse_approx
+
+gtf.igcn.data.low_rank_inverse_approx.k = %rank
+
+rank = 100

@@ -1,0 +1,3 @@
+include "igcn/config/impl/lp.gin"
+include "igcn/config/cora/_base.gin"
+epsilon = 0.1

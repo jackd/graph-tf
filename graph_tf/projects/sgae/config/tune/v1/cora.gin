@@ -22,9 +22,9 @@ log_dir = @gtf.os_utils.join_star()
 log_dir/gtf.os_utils.join_star.args = [%root_dir, %project_name, "tensorboard"]
 
 data = @gin.singleton()
-data/gin.singleton.constructor = @gtf.data.transformed
-data/gtf.data.transformed.base = %base_data
-data/gtf.data.transformed.transforms = @gtf.data.preprocess_autoencoder_data
+data/gin.singleton.constructor = @gtf.data.transforms.transformed
+data/gtf.data.transforms.transformed.base = %base_data
+data/gtf.data.transforms.transformed.transforms = @gtf.data.preprocess_autoencoder_data
 
 gtf.sgae.tune.data_transform_v1.data = %data
 

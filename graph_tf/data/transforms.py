@@ -3,6 +3,7 @@ import typing as tp
 
 import gin
 import tensorflow as tf
+from tflo.extras import LinearOperatorSparseMatrix
 
 from graph_tf.utils.graph_utils import (
     approx_effective_resistance_z,
@@ -22,6 +23,17 @@ configurable = functools.partial(gin.configurable, module="gtf.data.transforms")
 register(laplacian)
 register(signed_incidence)
 register(tril)
+
+
+@register
+def transformed(base, transforms: tp.Union[tp.Callable, tp.Iterable[tp.Callable]]):
+    if transforms is None:
+        return base
+    if callable(transforms):
+        return transforms(base)
+    for transform in transforms:
+        base = transform(base)
+    return base
 
 
 @register
@@ -70,7 +82,7 @@ def sparsify(
     Zi = tf.gather(Z, i, axis=0)
     Zj = tf.gather(Z, j, axis=0)
     prs = tf.reduce_sum(tf.math.squared_difference(Zi, Zj), axis=1)
-    prs = prs * matrix_conc_const * tf.math.log(n) / (epsilon ** 2) * v
+    prs = prs * matrix_conc_const * tf.math.log(n) / (epsilon**2) * v
     prs = tf.minimum(prs, tf.ones_like(prs))
     print(prs)
     mask = rng.uniform((m,)) < v * prs
@@ -151,3 +163,62 @@ def row_normalize(x: tp.Union[tf.Tensor, tf.SparseTensor]):
     row = x.indices[:, 0]
     factor = tf.math.segment_sum(x.values, row)
     return x.with_values(x.values / tf.gather(factor, row, axis=0))
+
+
+@register
+def page_rank_propagate(
+    adj: tf.SparseTensor,
+    x: tf.Tensor,
+    epsilon: float,
+    symmetric: bool = True,
+    tol: float = 1e-5,
+    max_iter: int = 1000,
+    parallel_iterations: tp.Optional[int] = None,
+) -> tf.Tensor:
+    adj.shape.assert_has_rank(2)
+    dtype = adj.dtype
+    assert dtype.is_floating
+    num_nodes = adj.shape[0]
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    x.shape.assert_has_rank(2)
+    I = tf.sparse.eye(num_nodes, dtype=dtype)
+    adj = normalize_sparse(adj, symmetric=symmetric)
+
+    L = tf.sparse.add(I, adj.with_values(adj.values * (epsilon - 1)))
+    L = LinearOperatorSparseMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+    if symmetric:
+
+        def solve(x):
+            iters, sol, *_ = tf.linalg.experimental.conjugate_gradient(
+                L, x, tol=tol, max_iter=max_iter
+            )
+            del iters
+            return sol
+
+    else:
+        raise NotImplementedError()
+
+    # if tf.executing_eagerly():
+    #     sols = [
+    #         solve(xi)
+    #         for xi in tqdm.tqdm(tf.unstack(x, axis=1), desc="Page-rank propagating")
+    #     ]
+    #     return tf.stack(sols, axis=1)
+
+    if parallel_iterations is None:
+        parallel_iterations = x.shape[1]
+    else:
+        parallel_iterations = min(x.shape[1], parallel_iterations)
+
+    @tf.function
+    def solve_all(x):
+        # map only works on axis 0, hence the double transpose
+        solT = tf.map_fn(
+            solve,
+            tf.transpose(x),
+            parallel_iterations=parallel_iterations,
+            fn_output_signature=tf.TensorSpec((num_nodes,), dtype=dtype),
+        )
+        return tf.transpose(solT)
+
+    return solve_all(x)

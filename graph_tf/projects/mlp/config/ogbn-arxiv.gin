@@ -1,0 +1,27 @@
+include "gtf_config/data/ogbn/arxiv.gin"
+include "mlp/config/_base.gin"
+
+features_transform = []
+
+gtf.utils.models.mlp.input_dropout_rate = %input_dropout_rate
+# gtf.utils.models.mlp.normalization = @gtf.utils.models.batch_norm
+# gtf.utils.models.batch_norm.momentum = 0.9
+# units = (256, 256, 256)
+
+input_dropout_rate = 0
+dropout_rate = 0.5
+lr = 1e-2
+weight_decay = 0
+
+epochs = 5000
+units = (256,)
+gtf.utils.models.mlp.normalization = None
+
+
+gtf.utils.models.mlp.activation = @gtf.utils.models.prelu
+
+# units = (512, 512, 512)
+# units = (1024, 512)
+# dropout_rate = 0.5
+# input_dropout_rate = 0.1
+# lr = 1e-3

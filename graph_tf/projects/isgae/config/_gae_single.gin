@@ -1,7 +1,7 @@
 include "isgae/config/_base.gin"
 include "gtf_config/data/gae_single.gin"
 
-gtf.data.transformed.transforms = @gtf.data.preprocess_autoencoder_data
+gtf.data.transforms.transformed.transforms = @gtf.data.preprocess_autoencoder_data
 features_transform = [
     @gtf.data.transforms.to_format,
     @gtf.data.transforms.row_normalize,

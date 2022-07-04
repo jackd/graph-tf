@@ -1,0 +1,14 @@
+import graph_tf.projects.igcn.scalable.losses
+import graph_tf.projects.igcn.scalable.metrics
+
+loss = @gtf.igcn.losses.QuadraticSparseCategoricalCrossentropy()
+gtf.igcn.losses.QuadraticSparseCategoricalCrossentropy.from_logits = %from_logits
+gtf.igcn.metrics.QuadraticSparseCategoricalCrossentropy.from_logits = %from_logits
+gtf.igcn.metrics.QuadraticSparseCategoricalCrossentropy.name = "quad_cross_entropy"
+gtf.igcn.losses.QuadraticSparseCategoricalCrossentropy.reduction = %reduction
+
+weighted_metrics = [
+    @tf.keras.metrics.SparseCategoricalCrossentropy(),
+    @tf.keras.metrics.SparseCategoricalAccuracy(),
+    @gtf.igcn.metrics.QuadraticSparseCategoricalCrossentropy(),
+]

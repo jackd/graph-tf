@@ -1,0 +1,34 @@
+include 'gtf_config/data/ogbn/arxiv.gin'
+include "igcn/config/impl/lp.gin"
+include "igcn/config/impl/lazy.gin"
+
+features_transform = []
+
+weight_decay = 0
+dropout_rate = 0.5
+epsilon = 0.1
+hidden_units = [256]
+epochs = 5000
+patience = 200
+monitor = 'val_cross_entropy'
+lr = 1e-2
+input_dropout_rate = 0
+tol = 1e-3
+
+
+# same as DAGNN
+# lr = 5e-3
+# gtf.utils.models.mlp.normalization = @gtf.utils.models.batch_norm
+# gtf.utils.models.batch_norm.momentum = 0.9
+# dropout_rate = 0.2
+# input_dropout_rate = 0
+# units = (256,)
+# epochs = 1000
+# patience = 1000
+
+# same as scalable.fit, based on sign
+lr = 1e-2
+weight_decay = 0
+dropout_rate = 0.5
+input_dropout_rate = 0
+activation = @gtf.utils.models.prelu

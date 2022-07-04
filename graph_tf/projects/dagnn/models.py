@@ -1,3 +1,5 @@
+import typing as tp
+
 import gin
 import tensorflow as tf
 
@@ -14,7 +16,13 @@ def dagnn_citations(
     dropout_rate: float = 0.2,
     num_propagations: int = 16,
     l2_reg: float = 0.0,
+    input_dropout_rate: tp.Optional[float] = None,
+    normalization: tp.Optional[tp.Callable] = None,
+    activation="relu",
 ):
+    activation = tf.keras.activations.get(activation)
+    if input_dropout_rate is None:
+        input_dropout_rate = dropout_rate
     inputs = tf.nest.map_structure(lambda s: tf.keras.Input(type_spec=s), inputs_spec)
     if len(inputs) == 3:
         x, a, ids = inputs
@@ -29,13 +37,15 @@ def dagnn_citations(
         bias_regularizer=reg,
     )
 
-    x = tf.keras.layers.Dropout(dropout_rate)(x)
+    x = tf.keras.layers.Dropout(input_dropout_rate)(x)
     x = tf.keras.layers.Dense(
         hidden_size,
-        activation="relu",
         bias_initializer=torch_compat.linear_bias_initializer(x.shape[-1]),
         **kwargs,
     )(x)
+    if normalization:
+        x = normalization(x)
+    x = activation(x)
     x = tf.keras.layers.Dropout(dropout_rate)(x)
     logits = tf.keras.layers.Dense(
         num_classes,

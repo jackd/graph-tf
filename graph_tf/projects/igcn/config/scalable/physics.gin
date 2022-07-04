@@ -1,0 +1,15 @@
+import graph_tf.data.transforms
+import graph_tf.configurables.core
+problem = "physics"
+num_classes = 7
+epsilon = 0.1
+weight_decay = 0
+dropout_rate = 0.8
+hidden_units = (64,)
+
+features_transform = @gtf.data.transforms.row_normalize
+batch_size = 512
+
+patience = 100
+epochs = 2000
+lr = 1e-2

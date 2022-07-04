@@ -1,0 +1,20 @@
+import graph_tf.projects.igcn.scalable
+import graph_tf.configurables.os_utils
+
+cache_path = @gtf.os_utils.join_star()
+
+cache_path/gtf.os_utils.join_star.args = [
+    %gtf_data_dir,
+    "igcn/scalable",
+    %problem_h5,
+]
+problem_h5 = @gtf.os_utils.with_extension()
+problem_h5/gtf.os_utils.with_extension.prefix = %problem
+problem_h5/gtf.os_utils.with_extension.extension = "h5"
+
+gtf_data_dir = @gtf.os_utils.get_environ()
+gtf_data_dir/gtf.os_utils.get_environ.key = "GRAPH_TF_DATA"
+gtf_data_dir/gtf.os_utils.get_environ.default = %default_gtf_data_dir
+
+default_gtf_data_dir = @gtf.os_utils.expand()
+default_gtf_data_dir/gtf.os_utils.expand.path = "~/graph-tf-data"

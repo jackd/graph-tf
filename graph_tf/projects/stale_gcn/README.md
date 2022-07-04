@@ -29,6 +29,8 @@ python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/p
 # val_acc            : 0.8034000217914581 +- 0.0074323665476892144
 # val_cross_entropy  : 0.5610684156417847 +- 0.01406437182554169
 # val_loss           : 0.5610684156417847 +- 0.01406437182554169
+python -m graph_tf stale_gcn/config/fit_and_test.gin stale_gcn/config/gcn/ogbn-arxiv.gin
+
 ```
 
 The same models can also be trained without subgraph batching.

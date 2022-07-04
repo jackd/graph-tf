@@ -1,0 +1,4 @@
+include "gtf_config/data/ogbn/_base.gin"
+
+problem = "ogbn-papers100M"
+num_classes = 172

@@ -53,7 +53,10 @@ class EpochProgbarLogger(tf.keras.callbacks.Callback):
             def __contains__(self, x):
                 return True
 
-        self.progbar = tf.keras.utils.Progbar(target=self.epochs, unit_name="epoch",)
+        self.progbar = tf.keras.utils.Progbar(
+            target=self.epochs,
+            unit_name="epoch",
+        )
         # probar uses stateful metrics to determine which metric values to average.
         # Since this is only called on_epoch_end, no metrics should be averaged
         # i.e. all metrics should be considered 'stateful'.
@@ -119,13 +122,22 @@ def fit_single(
     validation_data = unpack(validation_data)
     do_validation = validation_data is not None
 
-    params = dict(epochs=epochs, verbose=verbose, steps=1, do_validation=do_validation,)
+    params = dict(
+        epochs=epochs,
+        verbose=verbose,
+        steps=1,
+        do_validation=do_validation,
+    )
     callbacks = list(callbacks)
     if verbose:
         callbacks.append(EpochProgbarLogger())
 
     cb = tf.keras.callbacks.CallbackList(
-        callbacks, add_history=True, add_progbar=False, model=model, **params,
+        callbacks,
+        add_history=True,
+        add_progbar=False,
+        model=model,
+        **params,
     )
     del callbacks
     train_step = _build_train_step(model, train_data, jit_compile=jit_compile)
@@ -140,8 +152,10 @@ def fit_single(
     cb.on_train_begin(logs=None)
     # _maybe_load_initial_epoch_from_ckpt behaviour is influenced by
     # callbacks.experimental.BackupAndRestore
-    initial_epoch = model._maybe_load_initial_epoch_from_ckpt(  # pylint: disable=protected-access
-        initial_epoch
+    initial_epoch = (
+        model._maybe_load_initial_epoch_from_ckpt(  # pylint: disable=protected-access
+            initial_epoch
+        )
     )
 
     logs = None
@@ -200,7 +214,7 @@ def fit(
     Returns:
         history: `tf.keras.callbacks.History` object.
     """
-    if not isinstance(train_data, tf.data.Dataset) or len(train_data) == 1:
+    if not isinstance(train_data, tf.data.Dataset) or train_data.cardinality() == 1:
         assert steps_per_epoch is None or steps_per_epoch == 1
         return fit_single(
             model=model,

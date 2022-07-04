@@ -11,6 +11,7 @@ gtf.build_and_fit.loss = %loss
 gtf.build_and_fit.metrics = %metrics
 gtf.build_and_fit.weighted_metrics = %weighted_metrics
 gtf.build_and_fit.callbacks = %callbacks
+gtf.build_and_fit.steps_per_epoch = %steps_per_epoch
 gtf.build_and_fit.epochs = %epochs
 gtf.build_and_fit.validation_freq = %validation_freq
 gtf.build_and_fit.initial_epoch = %initial_epoch
@@ -30,6 +31,7 @@ epochs = 1
 validation_freq = 1
 initial_epoch = 0
 verbose = True
+steps_per_epoch = None
 
 # Requires:
 # data

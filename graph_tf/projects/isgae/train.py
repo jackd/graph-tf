@@ -92,7 +92,7 @@ def iterative_build_and_fit(
         else:
             cbs = list(callbacks)
             cbs.append(
-                tf.keras.callbacksTensorBoard(os.path.join(log_dir, f"iter-{i:03d}"))
+                tf.keras.callbacks.TensorBoard(os.path.join(log_dir, f"iter-{i:03d}"))
             )
         embedding, history, test_result = build_and_fit_iteration(
             data=data,

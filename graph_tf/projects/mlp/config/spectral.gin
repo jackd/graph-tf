@@ -1,0 +1,8 @@
+import graph_tf.utils.linalg
+
+adjacency_features = (
+    @gtf.utils.linalg.spectral_features,
+)
+gtf.utils.linalg.spectral_features.k = %num_eigs
+
+num_eigs = 128

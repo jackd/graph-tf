@@ -1,5 +1,5 @@
 import functools
-from typing import Any, Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
 
 import gin
 import numpy as np
@@ -10,28 +10,18 @@ from graph_tf.utils.train import fit, unpack
 from graph_tf.utils.type_specs import get_type_spec
 
 
-class InfiniteDataset:
-    def __init__(self, dataset: tf.data.Dataset, steps_per_epoch: int):
-        assert isinstance(dataset, tf.data.Dataset)
-        assert len(dataset) == tf.data.INFINITE_CARDINALITY
-        self._dataset = dataset
-        self._steps_per_epoch = steps_per_epoch
-
-    @property
-    def dataset(self):
-        return self._dataset
-
-    @property
-    def steps_per_epoch(self):
-        return self._steps_per_epoch
-
-
 def first(iterable: Iterable):
     it = iter(iterable)
     try:
         return next(it)
     except StopIteration as e:
         raise ValueError("iterable must have at least one entry") from e
+
+
+def print_results(results: Mapping[str, Any], print_fn: Callable[[str], None] = print):
+    width = max(len(k) for k in results) + 1
+    for k in sorted(results):
+        print_fn(f"{k.ljust(width)}: {results[k]}")
 
 
 @gin.configurable(module="gtf")
@@ -47,14 +37,9 @@ def build_and_fit(
     validation_freq: int = 1,
     initial_epoch: int = 0,
     verbose: bool = True,
+    steps_per_epoch: Optional[int] = None,
 ) -> Tuple[tf.keras.Model, tf.keras.callbacks.History, Dict[str, Any]]:
     train_data, validation_data, test_data = data
-
-    if isinstance(train_data, InfiniteDataset):
-        steps_per_epoch = train_data.steps_per_epoch
-        train_data = train_data.dataset
-    else:
-        steps_per_epoch = None
 
     if isinstance(train_data, tf.data.Dataset):
         spec = train_data.element_spec[0]
@@ -81,7 +66,6 @@ def build_and_fit(
         verbose=verbose,
         steps_per_epoch=steps_per_epoch,
     )
-
     results = {}
 
     def evaluate(data):
@@ -91,11 +75,6 @@ def build_and_fit(
             verbose = False
             data = tf.data.Dataset.from_tensors(unpack(data))
         return model.evaluate(data, return_dict=True, verbose=verbose)
-
-    def print_results(results):
-        width = max(len(k) for k in results) + 1
-        for k in sorted(results):
-            print(f"{k.ljust(width)}: {results[k]}")
 
     if validation_data is not None:
         val_res = evaluate(validation_data)

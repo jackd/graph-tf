@@ -10,3 +10,5 @@ callbacks = [
 ]
 
 tf.keras.callbacks.TensorBoard.log_dir = %log_dir
+tf.keras.callbacks.TensorBoard.profile_batch = %profile_batch
+profile_batch = 10

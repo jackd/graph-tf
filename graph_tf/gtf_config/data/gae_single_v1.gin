@@ -1,8 +1,8 @@
 include "gtf_config/data/gae.gin"
 
-data = @gtf.data.transformed()
-gtf.data.transformed.base = %base_data
-gtf.data.transformed.transforms = [
+data = @gtf.data.transforms.transformed()
+gtf.data.transforms.transformed.base = %base_data
+gtf.data.transforms.transformed.transforms = [
     @gtf.data.preprocess_autoencoder_data,
     @gtf.data.to_autoencoder_split,
 ]

@@ -28,3 +28,10 @@ def get_environ(key: str, default: tp.Optional[tp.Any] = None):
     if value is None:
         return default
     return value
+
+
+@register
+def with_extension(prefix: str, extension: str) -> str:
+    if extension.startswith("."):
+        return f"{prefix}{extension}"
+    return f"{prefix}.{extension}"

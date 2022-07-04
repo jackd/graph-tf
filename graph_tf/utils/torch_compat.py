@@ -7,6 +7,8 @@ import tensorflow as tf
 GradsAndVars = List[Tuple[tf.Tensor, tf.Variable]]
 GradientTransformer = Callable[[GradsAndVars], GradsAndVars]
 
+register = functools.partial(gin.register, module="gtf.utils")
+
 
 def linear_bias_initializer(fan_in: int):
     limit = tf.pow(tf.convert_to_tensor(fan_in, tf.float32), -0.5)
@@ -28,19 +30,19 @@ def with_weight_decay(
     return grads_and_vars
 
 
-@gin.configurable(module="gtf.utils")
+@register
 def weight_decay_transformer(weight_decay: float) -> GradientTransformer:
     """Get a `gradient_transformer` for use with `tf.keras.optimizers.Optimizer`."""
     return functools.partial(with_weight_decay, weight_decay=weight_decay)
 
 
-@gin.configurable(module="gtf.utils")
+@register
 def weight_decay_to_l2(weight_decay: float) -> float:
     l2_coeff = weight_decay / 2
     return l2_coeff
 
 
-@gin.configurable(module="gtf.utils")
+@register
 def l2_to_weight_decay(l2: float) -> float:
     weight_decay_coeff = l2 * 2
     return weight_decay_coeff

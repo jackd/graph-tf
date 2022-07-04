@@ -1,0 +1,11 @@
+import graph_tf.configurables
+
+callbacks = [
+    @tf.keras.callbacks.EarlyStopping(),
+    @tf.keras.callbacks.TensorBoard(),
+]
+tf.keras.callbacks.TensorBoard.log_dir = %log_dir
+tf.keras.callbacks.TensorBoard.profile_batch = %profile_batch
+
+profile_batch = (10, 20)
+log_dir = "/tmp/graph_tf/igcn/"

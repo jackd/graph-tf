@@ -7,7 +7,9 @@ weighted_metrics = [
     @tf.keras.metrics.SparseCategoricalAccuracy(),
 ]
 
-tf.keras.losses.SparseCategoricalCrossentropy.reduction = 'sum'
+tf.keras.losses.SparseCategoricalCrossentropy.reduction = %reduction
+
+reduction = 'sum'
 
 tf.keras.losses.SparseCategoricalCrossentropy.from_logits = %from_logits
 tf.keras.metrics.SparseCategoricalCrossentropy.from_logits = %from_logits
@@ -15,11 +17,3 @@ tf.keras.metrics.SparseCategoricalCrossentropy.from_logits = %from_logits
 from_logits = True
 tf.keras.metrics.SparseCategoricalCrossentropy.name = 'cross_entropy'
 tf.keras.metrics.SparseCategoricalAccuracy.name = 'acc'
-
-
-# TODO: why does the below make GCN results better??
-# import graph_tf.utils.losses
-# loss = [
-#     @gtf.utils.losses.WeightedMeanSparseCategoricalCrossentropy()
-# ]
-# gtf.utils.losses.WeightedMeanSparseCategoricalCrossentropy.from_logits = %from_logits

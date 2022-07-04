@@ -1,0 +1,18 @@
+import graph_tf.utils.models
+include 'gtf_config/data/ogbn/arxiv.gin'
+include 'dagnn/config/_base.gin'
+
+gtf.dagnn.dagnn_citations.input_dropout_rate = %input_dropout_rate
+gtf.dagnn.dagnn_citations.normalization = @gtf.utils.models.batch_norm
+gtf.utils.models.batch_norm.momentum = 0.9
+
+input_dropout_rate = 0
+dropout_rate = 0.2
+weight_decay = 0
+num_propagations = 16
+epochs = 1000
+patience = 1000
+hidden_size = 256
+lr = 5e-3
+monitor = "val_acc"
+tf.keras.callbacks.EarlyStopping.mode = "max"

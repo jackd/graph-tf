@@ -1,0 +1,4 @@
+include 'gtf_config/data/citations/cora.gin'
+
+weight_decay = 5e-3
+dropout_rate = 0.8

@@ -90,10 +90,10 @@ def do_stale_run(seed, cache_path):
     trainer = StaleTrainer(
         data,
         functools.partial(base_model_fn, l2_reg=l2_reg * batch_frac),
-        cache,
         train_batch_size=batch_size,
         cache_batch_size=-1,  # full batch
         use_dense_adjacency=use_dense_adjacency,
+        cache=cache,
         **get_compile_kwargs(),
     )
 

@@ -1,8 +1,16 @@
+import functools
 import typing as tp
 
+import gin
+import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as la
 import tensorflow as tf
+from tflo.extras import LinearOperatorSparseMatrix
+
+SparseLinearOperator = LinearOperatorSparseMatrix
+
+register = functools.partial(gin.register, module="gtf.utils.linalg")
 
 
 class EigenDecomposition(tp.NamedTuple):
@@ -10,9 +18,61 @@ class EigenDecomposition(tp.NamedTuple):
     vectors: tf.Tensor  # [N, K]
 
 
+@register
+def spectral_features(adj: tf.SparseTensor, k: int, **kwargs):
+    return laplacian_eigsh_from_adjacency(adj, k=k, **kwargs).vectors
+
+
+def sparse_tensor_to_coo(X: tf.SparseTensor) -> sp.coo_matrix:
+    if sp.issparse(X):
+        return X.tocoo()
+    return sp.coo_matrix((X.values.numpy(), X.indices.numpy().T), shape=X.shape)
+
+
 def eigsh(X: tf.SparseTensor, k: int = 6, **kwargs) -> EigenDecomposition:
-    X_coo = sp.coo_matrix((X.values.numpy(), X.indices.numpy().T), shape=X.shape)
+    X_coo = sparse_tensor_to_coo(X)
     w, v = la.eigsh(X_coo, k=k, **kwargs)
+    return EigenDecomposition(tf.convert_to_tensor(w), tf.convert_to_tensor(v))
+
+
+def laplacian_eigsh_from_adjacency_np(
+    adj: sp.spmatrix, k: int = 6, **kwargs
+) -> tp.Tuple[np.ndarray, np.ndarray]:
+    """`numpy` interface to `laplacian_eigsh_from_adjacency`."""
+    if "which" in kwargs:
+        assert kwargs["which"] == "SM", kwargs["which"]
+        del kwargs["which"]
+
+    d = np.asarray(adj.sum(axis=1)).squeeze(axis=1)
+    d_sqrt = np.sqrt(d)
+    adj = sp.coo_matrix(
+        (adj.data / (d_sqrt[adj.row] * d_sqrt[adj.col]), (adj.row, adj.col)),
+        shape=adj.shape,
+    )
+    shifted_lap = -sp.eye(adj.shape[0], dtype=adj.dtype) - adj
+    w, v = la.eigsh(shifted_lap, k=k, v0=d_sqrt / d.sum(), **kwargs)
+    w += 2
+    return w, v
+
+
+def laplacian_eigsh_from_adjacency(
+    adj: tf.SparseTensor, k: int = 6, **kwargs
+) -> EigenDecomposition:
+    """
+    Get partial eigenvalues/vectors of the symmetrically normalized laplacian.
+
+    Args:
+        adj: adjacency
+        k: number of eigenpairs to extract.
+        **kwargs: parsed to `scipy.sparse.linalg.cg`. If `which` is provided, it must be
+            "SM".
+
+    Returns:
+        w: [k] smallest eigenvalues.
+        v: [num_nodes, k] associated eigenvectors.
+    """
+    adj = sparse_tensor_to_coo(adj)
+    w, v = laplacian_eigsh_from_adjacency_np(sparse_tensor_to_coo(adj), k=k, **kwargs)
     return EigenDecomposition(tf.convert_to_tensor(w), tf.convert_to_tensor(v))
 
 
@@ -36,7 +96,7 @@ def eigsh_lap(
     return EigenDecomposition(tf.convert_to_tensor(w), tf.convert_to_tensor(v))
 
 
-class SubtractProjection(tf.linalg.LinearOperator):
+class SubtractProjection(tf.linalg.LinearOperator):  # pylint: disable=abstract-method
     """(I - X @ X.T) for X.shape == (n, r), r << n."""
 
     def __init__(self, X: tf.Tensor, **kwargs):
@@ -63,50 +123,45 @@ class SubtractProjection(tf.linalg.LinearOperator):
         return tf.eye(self._X.shape[0]) - tf.matmul(self._X, self._X, transpose_b=True)
 
     def _diag_part(self):
-        return 1 - tf.reduce_sum(self._X ** 2, axis=1)
+        return 1 - tf.reduce_sum(self._X**2, axis=1)
 
     def _shape_invariant_to_type_spec(self, shape):
         return tf.TensorSpec(shape, dtype=self.dtype)
 
 
-class SparseLinearOperator(tf.linalg.LinearOperator):
-    """`tf.linalg.LinearOperator` wrapper around `tf.SparseTensor`."""
+# class SparseLinearOperator(tf.linalg.LinearOperator):  # pylint: disable=abstract-method
+#     """`tf.linalg.LinearOperator` wrapper around `tf.SparseTensor`."""
 
-    def __init__(self, st: tf.SparseTensor, **kwargs):
-        self._st = st
-        super().__init__(dtype=self._st.dtype, **kwargs)
+#     def __init__(self, st: tf.SparseTensor, **kwargs):
+#         self._st = st
+#         super().__init__(dtype=self._st.dtype, **kwargs)
 
-    def _matmul(self, x, adjoint=False, adjoint_arg=False):
-        return tf.sparse.sparse_dense_matmul(
-            self._st, x, adjoint_a=adjoint, adjoint_b=adjoint_arg
-        )
+#     def _matmul(self, x, adjoint=False, adjoint_arg=False):
+#         return tf.sparse.sparse_dense_matmul(
+#             self._st, x, adjoint_a=adjoint, adjoint_b=adjoint_arg
+#         )
 
-    def _shape(self):
-        return self._st.shape
+#     def _shape(self):
+#         return self._st.shape
 
-    def _shape_tensor(self):
-        return self._st.dense_shape
+#     def _shape_tensor(self):
+#         return self._st.dense_shape
 
-    def _to_dense(self):
-        return tf.sparse.to_dense(self._st)
+#     def _to_dense(self):
+#         return tf.sparse.to_dense(self._st)
 
-    def _diag_part(self):
-        *batch_indices, i, j = tf.unstack(self._st.indices, axis=1)
-        mask = i == j
-        d = tf.boolean_mask(i, mask)
+#     def _diag_part(self):
+#         *batch_indices, i, j = tf.unstack(self._st.indices, axis=1)
+#         mask = i == j
+#         d = tf.boolean_mask(i, mask)
 
-        values = tf.boolean_mask(self._st.values, mask)
-        batch_dims, trailing_dims = tf.split(  # pylint: disable=no-value-for-parameter
-            self._st.dense_shape, [-1, 2]
-        )
-        # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
-        out_shape = tf.concat(
-            (batch_dims, tf.expand_dims(tf.reduce_min(trailing_dims), 0)), axis=0
-        )
-        # pylint: enable=unexpected-keyword-arg,no-value-for-parameter
-        return tf.scatter_nd(tf.stack((*batch_indices, d), axis=1), values, out_shape)
-
-    def _shape_invariant_to_type_spec(self, shape):
-        return self._st._shape_invariant_to_type_spec(  # pylint: disable=protected-access
-            shape
-        )
+#         values = tf.boolean_mask(self._st.values, mask)
+#         batch_dims, trailing_dims = tf.split(  # pylint: disable=no-value-for-parameter
+#             self._st.dense_shape, [-1, 2]
+#         )
+#         # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+#         out_shape = tf.concat(
+#             (batch_dims, tf.expand_dims(tf.reduce_min(trailing_dims), 0)), axis=0
+#         )
+#         # pylint: enable=unexpected-keyword-arg,no-value-for-parameter
+#         return tf.scatter_nd(tf.stack((*batch_indices, d), axis=1), values, out_shape)

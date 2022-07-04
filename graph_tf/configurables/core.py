@@ -1,4 +1,5 @@
 import gin
+import numpy as np
 import tensorflow as tf
 
 for opt in (
@@ -105,3 +106,5 @@ for metric in (
     tf.keras.metrics.TruePositives,
 ):
     gin.register(metric, module="tf.keras.metrics")
+
+gin.constant("INF", float(np.inf))

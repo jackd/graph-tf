@@ -1,0 +1,10 @@
+import graph_tf.data.single
+include "igcn/config/scalable/mains/_cache.gin"
+
+gacl.main.fun = @gtf.igcn.scalable.prepare_cache
+gtf.igcn.scalable.prepare_cache.path = %cache_path
+gtf.igcn.scalable.prepare_cache.data_fn = %data_fn
+gtf.igcn.scalable.prepare_cache.epsilon = %epsilon
+
+data_fn = @gtf.data.get_data
+gtf.data.get_data.name = %problem

@@ -4,13 +4,14 @@ import typing as tp
 from dataclasses import dataclass
 
 import gin
+import graph_tfds.graphs  # pylint: disable=unused-import
 import numpy as np
 import scipy.sparse as sp
-import tensorflow as tf
-
-import graph_tfds.graphs  # pylint: disable=unused-import
 import stfu.ops
+import tensorflow as tf
 import tensorflow_datasets as tfds
+
+from graph_tf.data.transforms import transformed
 from graph_tf.data.types import DataSplit
 from graph_tf.utils.graph_utils import get_largest_component_indices
 from graph_tf.utils.ops import indices_to_mask, unique_ravelled
@@ -22,12 +23,24 @@ register = functools.partial(gin.register, module="gtf.data")
 class SemiSupervisedSingle:
     """Data class for a single sparsely labelled graph."""
 
-    node_features: tp.Union[tf.Tensor, tf.SparseTensor]  # [N, F]
+    node_features: tp.Union[tf.Tensor, tf.SparseTensor, np.ndarray]  # [N, F]
     adjacency: tf.SparseTensor  # [N, N]
     labels: tf.Tensor  # [N]
     train_ids: tf.Tensor  # [n_train << N]
     validation_ids: tf.Tensor  # [n_eval << N]
     test_ids: tf.Tensor  # [n_test < N]
+
+    @property
+    def num_classes(self) -> int:
+        return int(tf.reduce_max(self.labels)) + 1
+
+    @property
+    def num_features(self) -> int:
+        return self.node_features.shape[1]
+
+    @property
+    def num_nodes(self) -> int:
+        return self.node_features.shape[0]
 
     def __post_init__(self):
         self.node_features.shape.assert_has_rank(2)
@@ -203,17 +216,6 @@ def to_autoencoder_split(data: AutoencoderData) -> DataSplit:
     )
 
 
-@register
-def transformed(base, transforms: tp.Union[tp.Callable, tp.Iterable[tp.Callable]]):
-    if transforms is None:
-        return base
-    if callable(transforms):
-        return transforms(base)
-    for transform in transforms:
-        base = transform(base)
-    return base
-
-
 def mask_test_edges(
     adj: sp.coo_matrix,
     seed: int = 0,
@@ -333,7 +335,7 @@ def _get_train_labels_and_weights(
     adj: tf.SparseTensor, *, remove_self_edges: bool = False
 ) -> tp.Tuple[tf.Tensor, tf.Tensor]:
     num_nodes = adj.shape[0]
-    num_nodes2 = num_nodes ** 2
+    num_nodes2 = num_nodes**2
     num_edges = adj.indices.shape[0]
     train_weights = tf.ones((num_nodes2,), tf.float32)
     pos_weight = float(num_nodes2 - num_edges) / num_edges
@@ -439,7 +441,8 @@ def preprocess_autoencoder_data(
 
 @register
 def random_features(
-    features_or_num_nodes: tp.Union[tf.Tensor, int], size: int,
+    features_or_num_nodes: tp.Union[tf.Tensor, int],
+    size: int,
 ):
     if isinstance(features_or_num_nodes, int):
         num_nodes = features_or_num_nodes
@@ -476,6 +479,13 @@ def _load_dgl_graph(dgl_example, make_symmetric=False) -> tf.SparseTensor:
     return tf.SparseTensor(
         tf.stack((r, c), axis=1), tf.ones(r.size, dtype=tf.float32), shape
     )
+
+
+@register
+def get_data(name: str, **kwargs) -> SemiSupervisedSingle:
+    if name.startswith("ogbn-"):
+        return ogbn_data(name, **kwargs)
+    return citations_data(name)
 
 
 @register
@@ -522,7 +532,9 @@ def citations_data(name: str = "cora") -> SemiSupervisedSingle:
 
 @register
 def ogbn_data(
-    name: str, data_dir: tp.Optional[str] = None, make_symmetric: bool = True,
+    name: str,
+    data_dir: tp.Optional[str] = None,
+    make_symmetric: bool = True,
 ) -> SemiSupervisedSingle:
     import ogb.nodeproppred  # pylint: disable=import-outside-toplevel
 
@@ -530,7 +542,7 @@ def ogbn_data(
     if not name.startswith("ogbn-"):
         name = f"ogbn-{name}"
 
-    print(f"Loading dgl ogbn-{name}...")
+    print(f"Loading dgl {name}...")
     ds = ogb.nodeproppred.DglNodePropPredDataset(name, root=root_dir)
     print("Got base data. Initial preprocessing...")
     split_ids = ds.get_idx_split()

@@ -1,0 +1,46 @@
+import graph_tf.data.single
+import graph_tf.utils.models
+import graph_tf.utils.misc
+import graph_tf.configurables
+import graph_tf.data.transforms
+
+preprocessed_data = @gtf.data.preprocess_base()
+gtf.data.preprocess_base.data = %base_data
+gtf.data.preprocess_base.largest_component_only = %largest_component_only
+gtf.data.preprocess_base.features_transform = %features_transform
+
+gtf.utils.models.mlp.hidden_units = %hidden_units
+gtf.utils.models.mlp.dropout_rate = %dropout_rate
+gtf.utils.models.mlp.input_dropout_rate = %input_dropout_rate
+gtf.utils.models.mlp.dense_fn = @gtf.utils.models.dense
+gtf.utils.models.mlp.activation = %activation
+
+gtf.utils.models.dense.kernel_regularizer = @tf.keras.regularizers.L2()
+tf.keras.regularizers.L2.l2 = %weight_decay
+
+callbacks = [@tf.keras.callbacks.EarlyStopping()]
+tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+tf.keras.callbacks.EarlyStopping.monitor = %monitor
+tf.keras.callbacks.EarlyStopping.patience = %patience
+
+optimizer = @tf.keras.optimizers.Adam()
+tf.keras.optimizers.Adam.learning_rate = %lr
+
+# tf.keras.optimizers.Adam.gradient_transformers = [@gtf.utils.weight_decay_transformer()]
+# gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
+
+
+features_transform = [
+    @gtf.data.transforms.to_format,
+    @gtf.data.transforms.row_normalize,
+]
+gtf.data.transforms.to_format.fmt = "dense"
+largest_component_only = False
+lr = 1e-2
+hidden_units = [64]
+epochs = 1000
+monitor = 'val_cross_entropy'
+patience = 100
+branched = False
+input_dropout_rate = None
+activation = 'relu'

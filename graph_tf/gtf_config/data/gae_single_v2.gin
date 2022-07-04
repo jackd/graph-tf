@@ -1,8 +1,8 @@
 include "gtf_config/data/gae.gin"
 
-data = @gtf.data.transformed()
-data/gtf.data.transformed.base = %base_data
-data/gtf.data.transformed.transforms = @gtf.data.preprocess_autoencoder_data_v2
+data = @gtf.data.transforms.transformed()
+data/gtf.data.transforms.transformed.base = %base_data
+data/gtf.data.transforms.transformed.transforms = @gtf.data.preprocess_autoencoder_data_v2
 gtf.data.preprocess_autoencoder_data_v2.adjacency_transform = %adjacency_transform
 gtf.data.preprocess_autoencoder_data_v2.features_transform = %features_transform
 gtf.data.preprocess_autoencoder_data_v2.largest_component_only = %largest_component_only
