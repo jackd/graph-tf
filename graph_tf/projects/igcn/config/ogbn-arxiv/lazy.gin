@@ -25,10 +25,3 @@ tol = 1e-3
 # units = (256,)
 # epochs = 1000
 # patience = 1000
-
-# same as scalable.fit, based on sign
-lr = 1e-2
-weight_decay = 0
-dropout_rate = 0.5
-input_dropout_rate = 0
-activation = @gtf.utils.models.prelu

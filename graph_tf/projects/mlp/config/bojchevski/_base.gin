@@ -1,0 +1,27 @@
+include "mlp/config/utils/_base.gin"
+include "mlp/config/utils/random-splits.gin"
+include "mlp/config/utils/page-rank.gin"
+
+features_transform = [@gtf.data.transforms.to_format]
+gtf.data.transforms.to_format.fmt = "dense"
+
+validation_samples_per_class = 200
+balanced_split = False
+
+largest_component_only = True
+
+gtf.data.transforms.page_rank_propagate.tol = 1e-2
+gtf.data.transforms.page_rank_propagate.parallel_iterations = 128
+gtf.data.transforms.page_rank_propagate.show_progress = %show_progress
+show_progress = True
+
+weight_decay = 1e-4
+lr = 5e-3
+units = [32]
+epochs = 200
+callbacks = []
+validation_freq = 999999
+epsilon = 0.25
+include_transformed_features = False
+batch_size = 512
+dropout_rate = 0.1

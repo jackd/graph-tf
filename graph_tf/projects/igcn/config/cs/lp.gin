@@ -1,0 +1,6 @@
+include "igcn/config/impl/lp.gin"
+include "igcn/config/cs/_base.gin"
+
+weight_decay = 0
+epsilon = 0.5
+dropout_rate = 0.8

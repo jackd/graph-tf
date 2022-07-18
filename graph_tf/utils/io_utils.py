@@ -139,7 +139,7 @@ def read_numpy(path: str):
 #     return _ZarrArray(zarr.open(_zarr_path(path), mode="r"))
 
 
-def _mmap_h5(ds: h5py.Dataset) -> np.memmap:
+def mmap_h5(ds: h5py.Dataset) -> np.memmap:
     # from https://gist.github.com/rossant/7b4704e8caeb8f173084
     # We get the dataset address in the HDF5 field.
     offset = ds.id.get_offset()
@@ -187,7 +187,7 @@ class H5MemmapGroup(tp.Mapping[str, tp.Union["H5MemmapGroup", np.memmap]]):
         dtype: tp.Optional[np.dtype] = None,
         data: tp.Optional[np.ndarray] = None,
     ) -> np.memmap:
-        return _mmap_h5(
+        return mmap_h5(
             self.root.create_dataset(name=name, shape=shape, dtype=dtype, data=data)
         )
 
@@ -198,14 +198,14 @@ class H5MemmapGroup(tp.Mapping[str, tp.Union["H5MemmapGroup", np.memmap]]):
         dtype: tp.Optional[np.dtype] = None,
         data: tp.Optional[np.ndarray] = None,
     ) -> np.memmap:
-        return _mmap_h5(
+        return mmap_h5(
             self.root.require_dataset(name=name, shape=shape, dtype=dtype, data=data)
         )
 
     def __getitem__(self, key: str):
         value = self.root[key]
         if isinstance(value, h5py.Dataset):
-            return _mmap_h5(value)
+            return mmap_h5(value)
         assert isinstance(value, h5py.Group)
         return H5MemmapGroup(value)
 

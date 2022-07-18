@@ -1,0 +1,11 @@
+import graph_tf.data.single
+
+include "gtf_config/data/bojchevski/mag-coarse.gin"
+include "mlp/config/bojchevski/_base.gin"
+include "mlp/config/utils/random-projection.gin"
+
+gtf.data.get_data.sparse_features = True
+
+show_progress = True
+projection_k = 128
+

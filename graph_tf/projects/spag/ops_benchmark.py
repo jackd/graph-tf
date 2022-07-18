@@ -1,11 +1,11 @@
 import numpy as np
 import tensorflow as tf
+from tfbm import Benchmark, benchmark
 
 from graph_tf.data import single
 from graph_tf.projects.spag.ops import chebyshev_subspace_iteration_sparse
 from graph_tf.utils.ops import to_laplacian
 from graph_tf.utils.test_utils import random_laplacian
-from tfbm import Benchmark, benchmark
 
 # pylint: disable=no-self-use
 
@@ -19,15 +19,15 @@ def get_random_inputs(
     return dict(data=a.values.numpy(), indices=a.indices.numpy(), v0=v0.numpy())
 
 
-def get_citations_inputs(
+def get_inputs(
     k: int,
-    name: str = "pub_med",
+    name: str = "pubmed",
     dtype: tf.DType = tf.float32,
     normalize: bool = True,
     shift: float = -2.0,
     seed: int = 0,
 ):
-    data = single.citations_data(name=name, largest_component_only=True)
+    data = single.get_largest_component(single.get_data(name=name))
     size = data.labels.shape[0]
     laplacian = to_laplacian(
         data.adjacency.with_values(tf.cast(data.adjacency.values, dtype)),
@@ -47,8 +47,8 @@ def get_citations_inputs(
 
 class EighBenchmark(Benchmark):
     BENCHMARK_SPEC = [
-        benchmark(device="cpu", kwargs=get_citations_inputs(k=4)),
-        benchmark(device="gpu", kwargs=get_citations_inputs(k=4)),
+        benchmark(device="cpu", kwargs=get_inputs(k=4)),
+        benchmark(device="gpu", kwargs=get_inputs(k=4)),
     ]
     # BENCHMARK_SPEC = [
     #     benchmark(device="gpu", kwargs=get_random_inputs(k=4, size=1000, nnz=10000))

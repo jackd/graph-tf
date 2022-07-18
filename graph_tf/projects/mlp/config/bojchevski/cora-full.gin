@@ -1,0 +1,6 @@
+import graph_tf.data.single
+
+include "gtf_config/data/bojchevski/cora-full.gin"
+include "mlp/config/bojchevski/_base.gin"
+
+show_progress = False  # faster

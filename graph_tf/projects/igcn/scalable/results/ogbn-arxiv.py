@@ -35,15 +35,15 @@ maxx = max(max(eig_ranks), max(jl_ranks))
 
 def scatter_and_plot(ax: plt.Axes, x, y, label):
     (line,) = ax.plot(x, y, label=label, linestyle="dashed")
-    color = line._color
+    color = line._color  # pylint: disable=protected-access
     ax.scatter(x, y, c=color)
     return color
 
 
 def plot_constant(ax: plt.Axes, y: float, std: float, label: str):
-    (line,) = ax0.plot([minx, maxx], [y, y], linestyle="dashed", label=label)
-    color = line._color
-    ax0.fill_between([minx, maxx], y - std, y + std, alpha=0.25, color=color)
+    (line,) = ax.plot([minx, maxx], [y, y], linestyle="dashed", label=label)
+    color = line._color  # pylint: disable=protected-access
+    ax.fill_between([minx, maxx], y - std, y + std, alpha=0.25, color=color)
     return color
 
 

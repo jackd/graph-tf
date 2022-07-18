@@ -1,0 +1,6 @@
+include 'gtf_config/data/dgl/computer.gin'
+include 'igcn/config/utils/random-splits.gin'
+
+patience = 300
+epochs = 3000
+largest_component_only = True

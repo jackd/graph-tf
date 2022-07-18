@@ -1,0 +1,10 @@
+import graph_tf.configurables
+
+callbacks = [
+    @tf.keras.callbacks.EarlyStopping(),
+    @tf.keras.callbacks.ReduceLROnPlateau(),
+    @tf.keras.callbacks.TensorBoard(),
+]
+tf.keras.callbacks.ReduceLROnPlateau.patience = %lr_patience
+tf.keras.callbacks.ReduceLROnPlateau.monitor = %monitor
+lr_patience = 100

@@ -1,5 +1,7 @@
 gin-config
 jax
+wget
+tqdm
 jju@ git+git://github.com/jackd/jju.git
 gacl@ git+git://github.com/jackd/gacl.git
 stfu@ git+git://github.com/jackd/stfu.git

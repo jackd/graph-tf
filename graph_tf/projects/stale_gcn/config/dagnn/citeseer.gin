@@ -1,0 +1,6 @@
+include 'gtf_config/data/citations/citeseer.gin'
+include 'stale_gcn/config/dagnn/_base.gin'
+
+weight_decay = 0.02
+dropout_rate = 0.5
+num_propagations = 10

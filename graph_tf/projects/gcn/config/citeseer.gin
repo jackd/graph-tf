@@ -1,0 +1,2 @@
+include 'gtf_config/data/citations/citeseer.gin'
+include 'gcn/config/_base.gin'

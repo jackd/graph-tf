@@ -1,0 +1,4 @@
+include "gtf_config/data/bojchevski/_base.gin"
+
+problem = "bojchevski-reddit"
+num_classes = 41

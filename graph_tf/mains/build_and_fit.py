@@ -5,7 +5,7 @@ import gin
 import numpy as np
 import tensorflow as tf
 
-from graph_tf.data.types import DataSplit
+from graph_tf.data.data_types import DataSplit
 from graph_tf.utils.train import fit, unpack
 from graph_tf.utils.type_specs import get_type_spec
 

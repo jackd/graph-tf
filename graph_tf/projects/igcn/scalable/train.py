@@ -13,7 +13,7 @@ from tflo.matrix.core import CompositionMatrix, FullMatrix
 
 from graph_tf.data.transforms import transformed
 from graph_tf.projects.igcn.scalable import jl, losses
-from graph_tf.projects.igcn.scalable.types import (
+from graph_tf.projects.igcn.scalable.data_types import (
     Features,
     FeaturesTransform,
     Transition,

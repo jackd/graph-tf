@@ -1,7 +1,0 @@
-# use weight decay like torch rather than l2 regularization
-include 'gtf_config/utils/weight_decay.gin'
-include 'gcn/config/pub_med.gin'
-
-tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
-l2_reg = 0
-weight_decay = 5e-4

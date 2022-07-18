@@ -1,0 +1,4 @@
+include "gtf_config/data/bojchevski/_base.gin"
+
+problem = "bojchevski-pubmed"
+num_classes = 3

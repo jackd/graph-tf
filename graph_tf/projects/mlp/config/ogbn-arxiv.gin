@@ -1,5 +1,5 @@
 include "gtf_config/data/ogbn/arxiv.gin"
-include "mlp/config/_base.gin"
+include "mlp/config/utils/_base.gin"
 
 features_transform = []
 
@@ -19,9 +19,3 @@ gtf.utils.models.mlp.normalization = None
 
 
 gtf.utils.models.mlp.activation = @gtf.utils.models.prelu
-
-# units = (512, 512, 512)
-# units = (1024, 512)
-# dropout_rate = 0.5
-# input_dropout_rate = 0.1
-# lr = 1e-3

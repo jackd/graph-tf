@@ -102,7 +102,6 @@ def eigsh(adj: tf.SparseTensor, *args, seed=0, **kwargs):
             (adj.values.numpy(), adj.indices.numpy().T), shape=adj.shape
         )
         if "v0" not in kwargs:
-            # kwargs["v0"] = np.random.uniform(size=adj.shape[0]).astype(adj.dtype)
             kwargs["v0"] = np.ones((adj.shape[0],), dtype=adj.dtype)
         w, v = eigsh_sp(adj, *args, **kwargs)
 
@@ -243,7 +242,7 @@ def get_spectral_split_v3(
             generator_fn,
             output_signature=tf.TensorSpec((batch_size, 2), dtype=tf.int64),
         )
-        dataset = dataset.apply(tf.data.experimental.assert_cardinality(num_parts ** 2))
+        dataset = dataset.apply(tf.data.experimental.assert_cardinality(num_parts**2))
         if shuffle and shuffle_buffer:
             dataset = dataset.shuffle(shuffle_buffer)
 
@@ -257,7 +256,7 @@ def get_spectral_split_v3(
                 axis=-1,
             )
             indices_1d = tf.where(
-                valid, indices_1d, num_nodes ** 2 * tf.ones_like(indices_1d)
+                valid, indices_1d, num_nodes**2 * tf.ones_like(indices_1d)
             )
             indices_1d = tf.reshape(indices_1d, (-1,))  # [batch_size ** 2]
             labels_ = tf.gather(labels, indices_1d, axis=0)

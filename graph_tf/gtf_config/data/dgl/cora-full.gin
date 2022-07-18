@@ -1,0 +1,4 @@
+include "gtf_config/data/dgl/_base.gin"
+
+problem = "cora-full"
+num_classes = 70

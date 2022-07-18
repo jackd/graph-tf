@@ -214,7 +214,11 @@ def fit(
     Returns:
         history: `tf.keras.callbacks.History` object.
     """
-    if not isinstance(train_data, tf.data.Dataset) or train_data.cardinality() == 1:
+
+    def is_single(data):
+        return not isinstance(data, tf.data.Dataset) or data.cardinality() == 1
+
+    if is_single(train_data) and is_single(validation_data):
         assert steps_per_epoch is None or steps_per_epoch == 1
         return fit_single(
             model=model,

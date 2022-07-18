@@ -18,8 +18,8 @@ fit = @gtf.sgae.tune.fit
 gtf.sgae.tune.fit.data_fn = @gtf.sgae.tune.data_transform_v1
 gtf.sgae.tune.fit.log_dir = %log_dir
 
-log_dir = @gtf.os_utils.join_star()
-log_dir/gtf.os_utils.join_star.args = [%root_dir, %project_name, "tensorboard"]
+log_dir = @gtf.utils.os_utils.join_star()
+log_dir/gtf.utils.os_utils.join_star.args = [%root_dir, %project_name, "tensorboard"]
 
 data = @gin.singleton()
 data/gin.singleton.constructor = @gtf.data.transforms.transformed

@@ -1,9 +1,0 @@
-import graph_tf.data.transforms
-import graph_tf.projects.mlp.data
-
-gtf.mlp.data.get_features_split.dual_features = [
-    @gtf.data.transforms.page_rank_propagate,
-]
-
-gtf.data.transforms.page_rank_propagate.epsilon = %epsilon
-epsilon = 0.1

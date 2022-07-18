@@ -1,6 +1,7 @@
 import graph_tf.configurables.kt
 import graph_tf.mains.build_and_fit
 import graph_tf.utils.experiment_callbacks
+import graph_tf.os_utils.experiment_callbacks
 
 gacl.main.fun = @kt.search
 gacl.main.callbacks = %experiment_callbacks
@@ -31,13 +32,13 @@ hypermodel = @kt.LambdaHyperModel()
 kt.LambdaHyperModel.build = %build
 kt.LambdaHyperModel.fit = %fit
 
-root_dir = @gtf.os_utils.join_star()
-root_dir/gtf.os_utils.join_star.args = [%GTF_DATA_DIR, 'tune']
+root_dir = @gtf.utils.os_utils.join_star()
+root_dir/gtf.utils.os_utils.join_star.args = [%GTF_DATA_DIR, 'tune']
 
-GTF_DATA_DIR = @gtf.os_utils.expand()
-GTF_DATA_DIR/gtf.os_utils.expand.path = @gtf.os_utils.get_environ()
-GTF_DATA_DIR/gtf.os_utils.get_environ.key = "GTF_DATA_DIR"
-GTF_DATA_DIR/gtf.os_utils.get_environ.default = "$HOME/gtf-data"
+GTF_DATA_DIR = @gtf.utils.os_utils.expand()
+GTF_DATA_DIR/gtf.utils.os_utils.expand.path = @gtf.utils.os_utils.get_environ()
+GTF_DATA_DIR/gtf.utils.os_utils.get_environ.key = "GTF_DATA_DIR"
+GTF_DATA_DIR/gtf.utils.os_utils.get_environ.default = "$HOME/gtf-data"
 
 overwrite = False
 executions_per_trial = 1

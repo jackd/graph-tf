@@ -1,0 +1,37 @@
+import graph_tf.data.cache
+import graph_tf.data.transitive
+import graph_tf.utils.os_utils
+
+include 'mlp/config/utils/_base.gin'
+include 'gtf_config/data/classification.gin'
+num_classes = 172
+
+base_data = None
+
+data/gin.singleton.constructor = @gtf.data.cache.cached_page_rank_splits
+gtf.data.cache.cached_page_rank_splits.cache_path = %cache_path
+gtf.data.cache.cached_page_rank_splits.data_fn = @gtf.data.transitive.cached_ogbn_papers100m
+gtf.data.cache.cached_page_rank_splits.epsilon = %epsilon
+gtf.data.cache.cached_page_rank_splits.max_iter = %max_iter
+gtf.data.cache.cached_page_rank_splits.tol = %tol
+gtf.data.cache.cached_page_rank_splits.batch_size = %batch_size
+gtf.data.cache.cached_page_rank_splits.in_memory = %in_memory
+
+cache_path = @gtf.utils.os_utils.expand()
+cache_path/gtf.utils.os_utils.expand.path = '$GTF_DATA_DIR/page-rank/ogbn-papers100m.h5'
+
+epsilon = (0.1, 1.0)
+max_iter = 100
+tol = 1e-3
+batch_size = 256
+in_memory = True
+
+units = (512, 512, 512)
+input_dropout_rate = 0
+dropout_rate = 0.3
+
+epochs = 45
+patience = 10
+normalization = @gtf.utils.models.batch_norm
+gtf.utils.models.batch_norm.momentum = 0.9
+weight_decay = 0

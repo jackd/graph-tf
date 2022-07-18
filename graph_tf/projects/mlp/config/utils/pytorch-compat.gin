@@ -1,0 +1,9 @@
+import graph_tf.utils.torch_compat
+
+kernel_regularizer = None
+tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
+gradient_transformers = [
+    @gtf.utils.torch_compat.weight_decay_transformer()
+]
+
+gtf.utils.torch_compat.weight_decay_transformer.weight_decay = %weight_decay

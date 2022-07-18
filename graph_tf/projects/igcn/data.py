@@ -10,6 +10,7 @@ from tflo.matrix.core import CompositionMatrix, FullMatrix, Matrix
 from tflo.matrix.extras import (
     CGSolverMatrix,
     GatherMatrix,
+    ProgMatrix,
     ScatterMatrix,
     SparseMatrix,
     StaticPowerSeriesMatrix,
@@ -35,9 +36,14 @@ def eliminate_zeros(st: tf.SparseTensor, epsilon: tp.Optional[float] = None):
     return st
 
 
-def _get_cg_solver(st: tf.SparseTensor, tol: float, max_iter: int) -> Matrix:
+def _get_cg_solver(
+    st: tf.SparseTensor, tol: float, max_iter: int, show_progress: bool = False
+) -> Matrix:
     sm = SparseMatrix(st, is_self_adjoint=True, is_positive_definite=True)
-    return CGSolverMatrix(sm, tol=tol, max_iter=max_iter)
+    solver = CGSolverMatrix(sm, tol=tol, max_iter=max_iter)
+    if show_progress:
+        solver = ProgMatrix(solver)
+    return solver
 
 
 @register
@@ -47,8 +53,9 @@ def sparse_cg_solver(
     tol: float = 1e-5,
     max_iter: int = 20,
     preprocess: bool = False,
+    show_progress: bool = False,
 ) -> tp.Union[Matrix, tf.Tensor]:
-    solver = _get_cg_solver(st, tol=tol, max_iter=max_iter)
+    solver = _get_cg_solver(st, tol=tol, max_iter=max_iter, show_progress=show_progress)
     if row_ids is None:
         if preprocess:
             return solver.to_dense()
@@ -226,196 +233,6 @@ def get_set_complement(ids: tf.Tensor, size: int) -> tf.Tensor:
     )
     mask = tf.logical_not(mask)
     return tf.squeeze(tf.where(mask), axis=1)
-
-
-# @register
-# def get_batched_logit_propagated_split_v3(
-#     data: SemiSupervisedSingle,
-#     laplacian_fn: tp.Callable[[tf.SparseTensor], tf.SparseTensor],
-#     batch_size: int,
-#     tol: float = 1e-5,
-#     max_iter: int = 20,
-#     preprocess_validation: bool = True,
-#     preprocess_test: bool = False,
-#     temperature: float = 1.0,  # high temperature -> uniform sampling
-#     seed: int = 0,
-# ) -> DataSplit:
-#     cg_kwargs = dict(tol=tol, max_iter=max_iter)
-#     laplacian = laplacian_fn(data.adjacency)
-#     train_smoother = sparse_cg_solver(
-#         laplacian, data.train_ids, preprocess=True, **cg_kwargs
-#     )
-#     logits = tf.reduce_sum(train_smoother, axis=0) / temperature
-
-#     train_labels = tf.gather(data.labels, data.train_ids, axis=0)
-#     train_weights = tf.fill(data.train_ids.shape, 1 / data.train_ids.shape[0])
-
-#     def map_fn(seed: tf.Tensor):
-#         ids = sample_without_replacement(seed, logits, batch_size)
-#         features = tf.gather(data.node_features, ids, axis=0)
-#         coeff = tf.gather(train_smoother, ids, axis=1)
-#         inputs = (coeff, features)
-#         return inputs, train_labels, train_weights
-
-#     train_dataset = tf.data.Dataset.random(seed=seed).batch(2).map(map_fn).prefetch(-1)
-
-#     def get_data(ids: tp.Optional[tf.Tensor], preprocess: bool):
-#         if ids is None:
-#             return None
-#         inv = sparse_cg_solver(laplacian, ids, preprocess=preprocess, **cg_kwargs)
-#         return tf.data.Dataset.from_tensors(
-#             (
-#                 (inv, data.node_features),
-#                 tf.gather(data.labels, ids, axis=0),
-#                 tf.fill(ids.shape, 1 / ids.shape[0]),
-#             )
-#         )
-
-#     return DataSplit(
-#         train_dataset,
-#         get_data(data.validation_ids, preprocess_validation),
-#         get_data(data.test_ids, preprocess_test),
-#     )
-
-
-# @register
-# def get_batched_logit_propagated_split_v2(
-#     data: SemiSupervisedSingle,
-#     laplacian_fn: tp.Callable[[tf.SparseTensor], tf.SparseTensor],
-#     feature_nodes_per_step: int,
-#     label_nodes_per_step: int,
-#     drop_remainder: bool = True,
-#     tol: float = 1e-5,
-#     max_iter: int = 20,
-#     preprocess_validation: bool = True,
-#     preprocess_test: bool = False,
-# ) -> DataSplit:
-#     """
-#     Sample feature_nodes_per_step non-train nodes and label_nodes_per_step train nodes.
-#     """
-#     tf.debugging.assert_equal(
-#         data.train_ids, tf.range(data.train_ids.shape[0], dtype=data.train_ids.dtype)
-#     )
-#     cg_kwargs = dict(tol=tol, max_iter=max_iter)
-#     laplacian = laplacian_fn(data.adjacency)
-#     num_nodes = laplacian.shape[1]
-#     train_smoother = sparse_cg_solver(
-#         laplacian, data.train_ids, preprocess=True, **cg_kwargs
-#     )
-#     train_ids = data.train_ids
-#     train_ids_ds = (
-#         tf.data.Dataset.from_tensor_slices(train_ids)
-#         .shuffle(train_ids.shape[0])
-#         .batch(label_nodes_per_step, drop_remainder=drop_remainder)
-#     )
-
-#     not_train_ids = get_set_complement(train_ids, num_nodes)
-#     not_train_ids_ds = (
-#         tf.data.Dataset.from_tensor_slices(not_train_ids)
-#         .shuffle(not_train_ids.shape[0])
-#         .repeat()
-#         .batch(feature_nodes_per_step)
-#     )
-
-#     train_ds = tf.data.Dataset.zip((train_ids_ds, not_train_ids_ds))
-#     train_weights = tf.fill(label_nodes_per_step, 1 / data.train_ids.shape[0])
-
-#     def map_fn(train_ids, not_train_ids):
-#         ids = (
-#             tf.concat(  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
-#                 (train_ids, not_train_ids), axis=0
-#             )
-#         )
-#         features = tf.gather(data.node_features, ids, axis=0)
-#         coeff = tf.gather(train_smoother, train_ids, axis=0)
-#         coeff = tf.gather(coeff, ids, axis=1)
-#         inputs = (coeff, features)
-#         labels = tf.gather(data.labels, train_ids)
-#         return inputs, labels, train_weights
-
-#     train_ds = train_ds.map(map_fn).prefetch(-1)
-
-#     def get_data(ids: tp.Optional[tf.Tensor], preprocess: bool):
-#         if ids is None:
-#             return None
-#         inv = sparse_cg_solver(laplacian, ids, preprocess=preprocess, **cg_kwargs)
-#         return tf.data.Dataset.from_tensors(
-#             (
-#                 (inv, data.node_features),
-#                 tf.gather(data.labels, ids, axis=0),
-#                 tf.fill(ids.shape, 1 / ids.shape[0]),
-#             )
-#         )
-
-#     return DataSplit(
-#         train_ds,
-#         get_data(data.validation_ids, preprocess_validation),
-#         get_data(data.test_ids, preprocess_test),
-#     )
-
-
-# @register
-# def get_batched_logit_propagated_split(
-#     data: SemiSupervisedSingle,
-#     laplacian_fn: tp.Callable[[tf.SparseTensor], tf.SparseTensor],
-#     batch_size: int,
-#     drop_remainder: bool = True,
-#     tol: float = 1e-5,
-#     max_iter: int = 20,
-#     preprocess_validation: bool = True,
-#     preprocess_test: bool = False,
-#     always_include_train_ids: bool = True,
-# ) -> DataSplit:
-#     cg_kwargs = dict(tol=tol, max_iter=max_iter)
-#     laplacian = laplacian_fn(data.adjacency)
-#     num_nodes = laplacian.shape[1]
-#     train_smoother = sparse_cg_solver(
-#         laplacian, data.train_ids, preprocess=True, **cg_kwargs
-#     )
-
-#     train_labels = tf.gather(data.labels, data.train_ids, axis=0)
-#     train_weights = tf.fill(data.train_ids.shape, 1 / data.train_ids.shape[0])
-
-#     def map_fn(ids):
-#         if always_include_train_ids:
-#             ids = tf.concat(  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
-#                 (ids, data.train_ids), axis=0
-#             )
-#         ids = tf.sort(ids)
-#         features = tf.gather(data.node_features, ids, axis=0)
-#         coeff = tf.gather(train_smoother, ids, axis=1)
-#         inputs = (coeff, features)
-#         return inputs, train_labels, train_weights
-
-#     if always_include_train_ids:
-#         train_dataset = tf.data.Dataset.from_tensor_slices(
-#             get_set_complement(data.train_ids, num_nodes)
-#         )
-#     else:
-#         train_dataset = tf.data.Dataset.range(num_nodes)
-#     train_dataset = (
-#         train_dataset.shuffle(len(train_dataset))
-#         .batch(batch_size, drop_remainder=drop_remainder)
-#         .map(map_fn)
-#     )
-
-#     def get_data(ids: tp.Optional[tf.Tensor], preprocess: bool):
-#         if ids is None:
-#             return None
-#         inv = sparse_cg_solver(laplacian, ids, preprocess=preprocess, **cg_kwargs)
-#         return tf.data.Dataset.from_tensors(
-#             (
-#                 (inv, data.node_features),
-#                 tf.gather(data.labels, ids, axis=0),
-#                 tf.fill(ids.shape, 1 / ids.shape[0]),
-#             )
-#         )
-
-#     return DataSplit(
-#         train_dataset,
-#         get_data(data.validation_ids, preprocess_validation),
-#         get_data(data.test_ids, preprocess_test),
-#     )
 
 
 @register

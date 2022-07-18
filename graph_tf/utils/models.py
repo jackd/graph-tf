@@ -4,6 +4,9 @@ import typing as tp
 import gin
 import tensorflow as tf
 
+from graph_tf.utils.layers import SparseDropout
+from graph_tf.utils.type_checks import is_sparse_tensor
+
 register = functools.partial(gin.register, module="gtf.utils.models")
 
 
@@ -46,7 +49,10 @@ def mlp(
     def dropout(x, dropout_rate=dropout_rate):
         if dropout_rate:
             shape = x.shape
-            x = tf.keras.layers.Dropout(dropout_rate)(x)
+            if is_sparse_tensor(x):
+                x = SparseDropout(dropout_rate)(x)
+            else:
+                x = tf.keras.layers.Dropout(dropout_rate)(x)
             x.set_shape(shape)
         return x
 

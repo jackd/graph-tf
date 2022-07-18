@@ -1,7 +1,0 @@
-include 'gtf_config/data/citations/cite_seer.gin'
-include 'gcn2/config/_base.gin'
-
-num_hidden_layers = 32
-filters = 256
-lam = 0.6
-dropout_rate = 0.7

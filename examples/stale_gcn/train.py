@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import tensorflow as tf
 
-from graph_tf.data.single import SemiSupervisedSingle, citations_data
+from graph_tf.data.single import SemiSupervisedSingle, get_data
 from graph_tf.data.transforms import (
     add_identity,
     normalize_symmetric,
@@ -29,7 +29,7 @@ num_runs = 10
 
 tf.random.set_seed(seed)
 
-data = citations_data("cora")
+data = get_data("cora")
 num_nodes = data.adjacency.shape[0]
 batch_frac = batch_size / num_nodes
 steps_per_epoch = num_nodes // batch_size + int(num_nodes % batch_size > 0)

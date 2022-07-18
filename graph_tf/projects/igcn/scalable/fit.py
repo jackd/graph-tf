@@ -11,7 +11,7 @@ from graph_tf.data.single import SemiSupervisedSingle
 from graph_tf.mains.build_and_fit import print_results
 from graph_tf.projects.igcn.scalable import eval as eval_lib
 from graph_tf.projects.igcn.scalable import train as train_lib
-from graph_tf.projects.igcn.scalable.types import Features, FeaturesTransform
+from graph_tf.projects.igcn.scalable.data_types import Features, FeaturesTransform
 from graph_tf.utils.train import EpochProgbarLogger
 
 register = functools.partial(gin.register, module="gtf.igcn.scalable")

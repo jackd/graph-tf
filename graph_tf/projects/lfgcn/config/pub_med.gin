@@ -1,2 +1,0 @@
-include 'gtf_config/data/citations/pub_med.gin'
-include 'lfgcn/config/_base.gin'

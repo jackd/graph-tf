@@ -1,8 +1,0 @@
-include 'gtf_config/data/citations/pub_med.gin'
-include 'stale_gcn/config/gcn2/_base.gin'
-
-num_hidden_layers = 16
-filters = 256
-lam = 0.4
-dropout_rate = 0.5
-conv_weight_decay = 5e-4

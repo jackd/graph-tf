@@ -1,2 +1,2 @@
-include "gtf_config/data/citations/cite_seer.gin"
+include "gtf_config/data/citations/citeseer.gin"
 include "sgae/config/_single_v1.gin"

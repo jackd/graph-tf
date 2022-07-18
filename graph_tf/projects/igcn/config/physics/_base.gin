@@ -1,0 +1,7 @@
+include 'gtf_config/data/dgl/physics.gin'
+include 'igcn/config/utils/random-splits.gin'
+
+lr = 1e-2
+patience = 100
+epochs = 1000
+fmt = "sparse"

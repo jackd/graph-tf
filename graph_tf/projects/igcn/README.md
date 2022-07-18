@@ -75,6 +75,21 @@ python -m graph_tf gtf_config/build_and_fit_many.gin igcn/config/ogbn-arxiv/lazy
 # val_acc            = 0.7113057553768158 +- 0.0016876702252022727
 # val_cross_entropy  = 0.9472987592220307 +- 0.002420426133449007
 # val_loss           = 0.9472986996173859 +- 0.002420426133449007
+python -m graph_tf gtf_config/build_and_fit_many.gin igcn/config/ogbn-arxiv/lazy.gin \
+--bindings='
+    dropout_rate = 0.5
+    hidden_units = [1024, 512]
+    input_dropout_rate = 0
+    activation = @gtf.utils.models.prelu
+    lr = 2e-3
+'
+# Results for 10 runs
+# test_acc           = 0.7161286473274231 +- 0.0025397897810463554
+# test_cross_entropy = 0.9138263821601867 +- 0.00496579910710566
+# test_loss          = 0.9138263881206512 +- 0.004965807240956798
+# val_acc            = 0.7303064286708831 +- 0.0012159245317773944
+# val_cross_entropy  = 0.8782849431037902 +- 0.0025077329234558044
+# val_loss           = 0.8782848834991455 +- 0.0025077232637869553
 ```
 
 ### Quadratic Loss Approximation

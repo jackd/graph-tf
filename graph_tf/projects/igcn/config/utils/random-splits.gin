@@ -1,0 +1,16 @@
+import graph_tf.data.single
+
+data = @gtf.igcn.data.get_logit_propagated_split()
+
+gtf.igcn.data.get_logit_propagated_split.data = @gtf.data.with_random_split_ids()
+
+gtf.data.with_random_split_ids.data = %preprocessed_data
+gtf.data.with_random_split_ids.train_samples_per_class = %train_samples_per_class
+gtf.data.with_random_split_ids.validation_samples_per_class = %validation_samples_per_class
+gtf.data.with_random_split_ids.seed = %split_seed
+gtf.data.with_random_split_ids.balanced = %balanced_split
+
+split_seed = None
+balanced_split = True
+train_samples_per_class = 20
+validation_samples_per_class = 30

@@ -1,0 +1,9 @@
+import graph_tf.data.transforms
+
+features_transform = [
+    @gtf.data.transforms.random_projection
+]
+
+gtf.data.transforms.random_projection.k_or_eps = %projection_k
+
+projection_k = 128

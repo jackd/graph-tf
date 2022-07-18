@@ -1,9 +1,0 @@
-data_fn = @gtf.igcn.data.get_batched_logit_propagated_split_v2
-gtf.igcn.data.get_batched_logit_propagated_split_v2.data = %preprocessed_data
-gtf.igcn.data.get_batched_logit_propagated_split_v2.laplacian_fn = %laplacian_fn
-gtf.igcn.data.get_batched_logit_propagated_split_v2.label_nodes_per_step = %label_nodes_per_step
-gtf.igcn.data.get_batched_logit_propagated_split_v2.feature_nodes_per_step = %feature_nodes_per_step
-gtf.igcn.data.get_batched_logit_propagated_split_v2.max_iter = %max_iter
-
-label_nodes_per_step = 32
-feature_nodes_per_step = 512

@@ -25,7 +25,7 @@ python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/cora.gin
 # val_acc            = 0.7909999132156372 +- 0.004753927153450943
 # val_cross_entropy  = 0.8101876616477967 +- 0.012065930356040111
 # val_loss           = 1.0685733318328858 +- 0.012282761192363281
-python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/cite_seer.gin
+python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/citeseer.gin
 # Results for 10 runs
 # test_acc           = 0.7072999894618988 +- 0.006197591939338053
 # test_cross_entropy = 1.030307936668396 +- 0.015719112612142254
@@ -33,7 +33,7 @@ python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/cite_seer.gin
 # val_acc            = 0.708600002527237 +- 0.00774855726168702
 # val_cross_entropy  = 1.0521578669548035 +- 0.016078652755661334
 # val_loss           = 1.3272119879722595 +- 0.017350497404265613
-python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/pub_med.gin
+python -m graph_tf gtf_config/build_and_fit_many.gin gcn/config/pubmed.gin
 # Results for 10 runs
 # test_acc           = 0.7905998885631561 +- 0.00280000141694776
 # test_cross_entropy = 0.5838302612304688 +- 0.009914963454400681

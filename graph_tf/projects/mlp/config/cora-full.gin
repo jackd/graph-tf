@@ -1,0 +1,14 @@
+import graph_tf.data.single
+
+include "gtf_config/data/dgl/cora-full.gin"
+include "mlp/config/utils/_base.gin"
+include "mlp/config/utils/random-splits.gin"
+
+features_transform = [@gtf.data.transforms.random_projection]
+gtf.data.transforms.random_projection.k_or_eps = 0.15
+gtf.data.get_data.sparse_features = True
+
+validation_samples_per_class = 200
+balanced_split = False
+
+largest_component_only = True

@@ -1,0 +1,4 @@
+include "gtf_config/data/bojchevski/_base.gin"
+
+problem = "bojchevski-cora-full"
+num_classes = 70

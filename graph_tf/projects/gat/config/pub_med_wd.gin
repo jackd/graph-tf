@@ -1,6 +1,0 @@
-include 'gtf_config/utils/weight_decay.gin'
-include 'gat/config/pub_med.gin'
-
-l2_reg = 0  # use graident_transformers below instead
-tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
-weight_decay = 1e-3

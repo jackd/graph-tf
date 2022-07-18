@@ -1,2 +1,2 @@
 include 'gtf_config/data/citations/cora.gin'
-include 'mlp/config/_base.gin'
+include 'mlp/config/utils/_base.gin'

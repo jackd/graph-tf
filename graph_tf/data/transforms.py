@@ -2,9 +2,14 @@ import functools
 import typing as tp
 
 import gin
+import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as la
 import tensorflow as tf
+import tqdm
 from tflo.extras import LinearOperatorSparseMatrix
 
+from graph_tf.utils import scipy_utils
 from graph_tf.utils.graph_utils import (
     approx_effective_resistance_z,
     laplacian,
@@ -165,15 +170,63 @@ def row_normalize(x: tp.Union[tf.Tensor, tf.SparseTensor]):
     return x.with_values(x.values / tf.gather(factor, row, axis=0))
 
 
+def johnson_lindenstrauss_min_dim(n_samples: int, *, eps: float) -> int:
+    denominator = (eps**2 / 2) - (eps**3 / 3)
+    return int((4 * np.log(n_samples) / denominator))
+
+
+@register
+def random_projection(
+    features: tp.Union[tf.Tensor, tf.SparseTensor],
+    k_or_eps: tp.Union[int, float],
+    seed: tp.Optional[int] = None,
+) -> tf.Tensor:
+    if seed is None:
+        rng = tf.random.get_global_generator()
+    else:
+        rng = tf.random.Generator.from_seed(seed)
+    # num_nodes, n = features.shape
+    n = features.shape[1]
+    if isinstance(k_or_eps, int):
+        k = k_or_eps
+    else:
+        assert isinstance(k_or_eps, float)
+        k = johnson_lindenstrauss_min_dim(features.shape[1], eps=k_or_eps)
+    if isinstance(features, tf.SparseTensor):
+        R = rng.normal((n, k), stddev=1 / np.sqrt(k)).numpy()
+        return tf.sparse.sparse_dense_matmul(features, R)
+        # def project_col(col):
+        #     return tf.squeeze(
+        #         tf.sparse.sparse_dense_matmul(features, tf.expand_dims(col, axis=1)),
+        #         axis=1,
+        #     )
+
+        # @tf.function
+        # def project(R):
+        #     return tf.map_fn(
+        #         project_col,
+        #         R,
+        #         fn_output_signature=tf.TensorSpec(
+        #             shape=(num_nodes,), dtype=features.dtype
+        #         ),
+        #     )
+
+        # return tf.transpose(project(R))
+    R = rng.normal((n, k), stddev=1 / np.sqrt(k))
+    return tf.linalg.matmul(features, R)
+
+
 @register
 def page_rank_propagate(
     adj: tf.SparseTensor,
     x: tf.Tensor,
-    epsilon: float,
+    epsilon: tp.Union[float, tp.Iterable[float]],
     symmetric: bool = True,
     tol: float = 1e-5,
     max_iter: int = 1000,
     parallel_iterations: tp.Optional[int] = None,
+    device: str = "/cpu:0",
+    show_progress: bool = True,
 ) -> tf.Tensor:
     adj.shape.assert_has_rank(2)
     dtype = adj.dtype
@@ -182,43 +235,77 @@ def page_rank_propagate(
     x = tf.convert_to_tensor(x, dtype=dtype)
     x.shape.assert_has_rank(2)
     I = tf.sparse.eye(num_nodes, dtype=dtype)
+    row_sum = tf.sparse.reduce_sum(adj, axis=1)
+    x0 = tf.sqrt(row_sum) / tf.reduce_sum(row_sum).numpy()
     adj = normalize_sparse(adj, symmetric=symmetric)
+    if isinstance(epsilon, float):
+        epsilon = (epsilon,)
+    else:
+        assert len(epsilon) > 0
 
-    L = tf.sparse.add(I, adj.with_values(adj.values * (epsilon - 1)))
-    L = LinearOperatorSparseMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+    out = []
+
     if symmetric:
+        if show_progress:
 
-        def solve(x):
-            iters, sol, *_ = tf.linalg.experimental.conjugate_gradient(
-                L, x, tol=tol, max_iter=max_iter
-            )
-            del iters
-            return sol
+            def solve(L: sp.spmatrix, x: tf.Tensor):
+                x, info = la.cg(L, x, x0=x0, tol=tol, maxiter=max_iter)
+                del info
+                return x
+
+        else:
+
+            def solve(L: LinearOperatorSparseMatrix, x: tf.Tensor):
+                iters, sol, *_ = tf.linalg.experimental.conjugate_gradient(
+                    L, x, tol=tol, max_iter=max_iter, x=x0
+                )
+                del iters
+                return sol
 
     else:
         raise NotImplementedError()
 
-    # if tf.executing_eagerly():
-    #     sols = [
-    #         solve(xi)
-    #         for xi in tqdm.tqdm(tf.unstack(x, axis=1), desc="Page-rank propagating")
-    #     ]
-    #     return tf.stack(sols, axis=1)
+    for eps in epsilon:
+        if eps == 1:
+            out.append(x)
+            continue
+        assert 0 < eps < 1, eps
+        L = tf.sparse.add(I, adj.with_values(adj.values * (eps - 1)))
+        if parallel_iterations is None:
+            parallel_iterations = x.shape[1]
+        else:
+            parallel_iterations = min(x.shape[1], parallel_iterations)
 
-    if parallel_iterations is None:
-        parallel_iterations = x.shape[1]
-    else:
-        parallel_iterations = min(x.shape[1], parallel_iterations)
+        if show_progress:
+            L = scipy_utils.to_scipy(L)
 
-    @tf.function
-    def solve_all(x):
-        # map only works on axis 0, hence the double transpose
-        solT = tf.map_fn(
-            solve,
-            tf.transpose(x),
-            parallel_iterations=parallel_iterations,
-            fn_output_signature=tf.TensorSpec((num_nodes,), dtype=dtype),
-        )
-        return tf.transpose(solT)
+            def solve_all(x: tf.Tensor):
+                out = np.zeros(x.shape, dtype=x.dtype.as_numpy_dtype)
+                for i in tqdm.trange(x.shape[1], desc="Computing page-rank vectors"):
+                    out[:, i] = solve(L, x[:, i])  # pylint: disable=cell-var-from-loop
+                return tf.convert_to_tensor(out, x.dtype)
 
-    return solve_all(x)
+        else:
+            L = LinearOperatorSparseMatrix(
+                L, is_self_adjoint=True, is_positive_definite=True
+            )
+
+            @tf.function
+            def solve_all(x: tf.Tensor):
+                # map only works on axis 0, hence the double transpose
+                solT = tf.map_fn(
+                    # lambda x: solve(L, x),
+                    functools.partial(solve, L),  # pylint: disable=cell-var-from-loop
+                    tf.transpose(x),
+                    parallel_iterations=parallel_iterations,
+                    fn_output_signature=tf.TensorSpec((num_nodes,), dtype=dtype),
+                )
+                return tf.transpose(solT)
+
+        with tf.device(device):
+            out.append(solve_all(x))
+    if len(out) == 1:
+        return out[0]
+    return tf.concat(  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+        out, axis=-1
+    )

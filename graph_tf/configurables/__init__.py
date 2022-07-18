@@ -1,3 +1,3 @@
-from graph_tf.configurables import core, os_utils
+from graph_tf.configurables import core
 
-__all__ = ["os_utils", "core"]
+__all__ = ["core"]

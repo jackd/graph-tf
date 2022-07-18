@@ -1,0 +1,13 @@
+import graph_tf.data.transforms
+import graph_tf.projects.mlp.data
+
+dual_features = [
+    @gtf.data.transforms.page_rank_propagate,
+]
+
+gtf.data.transforms.page_rank_propagate.epsilon = %epsilon
+gtf.data.transforms.page_rank_propagate.tol = %tol
+gtf.data.transforms.page_rank_propagate.max_iter = %max_iter
+epsilon = 0.1
+tol = 1e-3
+max_iter = 100

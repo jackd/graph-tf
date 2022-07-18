@@ -1,0 +1,19 @@
+import graph_tf.data.single
+import graph_tf.projects.mlp.data
+
+data = @gtf.mlp.data.get_features_split()
+gtf.mlp.data.get_features_split.data = @gtf.data.with_random_split_ids()
+
+gtf.data.with_random_split_ids.data = %preprocessed_data
+preprocessed_data = @gin.singleton()
+preprocessed_data/gin.singleton.constructor = @gtf.mlp.data.preprocess
+
+gtf.data.with_random_split_ids.train_samples_per_class = %train_samples_per_class
+gtf.data.with_random_split_ids.validation_samples_per_class = %validation_samples_per_class
+gtf.data.with_random_split_ids.seed = %split_seed
+gtf.data.with_random_split_ids.balanced = %balanced_split
+
+split_seed = None
+balanced_split = True
+train_samples_per_class = 20
+validation_samples_per_class = 30

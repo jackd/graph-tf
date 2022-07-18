@@ -1,0 +1,4 @@
+include "gtf_config/data/citations/_base.gin"
+
+problem = "citeseer"
+num_classes = 6

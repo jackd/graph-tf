@@ -13,7 +13,7 @@ python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/c
 # val_acc            : 0.7547999024391174 +- 0.007547162607987161
 # val_cross_entropy  : 0.9878926157951355 +- 0.051033062184595517
 # val_loss           : 0.9878927290439605 +- 0.051033063771345984
-python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/cite_seer.gin
+python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/citeseer.gin
 # Results for 10 runs
 # test_acc           : 0.6724999845027924 +- 0.008947083940708233
 # test_cross_entropy : 1.0951887726783753 +- 0.03665642908056622
@@ -21,7 +21,7 @@ python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/c
 # val_acc            : 0.6685999989509582 +- 0.013298131653806111
 # val_cross_entropy  : 1.1299167633056642 +- 0.038982742639150886
 # val_loss           : 1.1299167633056642 +- 0.038982742639150886
-python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/pub_med.gin
+python -m graph_tf stale_gcn/config/fit_and_test_many.gin stale_gcn/config/gcn/pubmed.gin
 # Results for 10 runs
 # test_acc           : 0.7796998858451843 +- 0.005762816743594405
 # test_cross_entropy : 0.5895079493522644 +- 0.014903778098054713

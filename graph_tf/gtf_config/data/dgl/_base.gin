@@ -1,0 +1,6 @@
+import graph_tf.data.single
+
+include "gtf_config/data/classification.gin"
+
+base_data = @gtf.data.get_data()
+gtf.data.get_data.name = %problem

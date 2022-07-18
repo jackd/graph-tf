@@ -56,4 +56,5 @@ def to_scipy(st: tf.SparseTensor) -> sp.coo_matrix:
 
 def to_tf(sp_matrix: tp.Union[sp.coo_matrix, sp.csr_matrix]) -> tf.SparseTensor:
     coo: sp.coo_matrix = sp_matrix.tocoo()
-    return tf.SparseTensor(tf.stack((coo.row, coo.col), axis=1), coo.data, coo.shape)
+    row, col = (tf.convert_to_tensor(x, tf.int64) for x in (coo.row, coo.col))
+    return tf.SparseTensor(tf.stack((row, col), axis=1), coo.data, coo.shape)

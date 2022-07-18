@@ -3,18 +3,20 @@ import os
 import typing as tp
 from dataclasses import dataclass
 
+import dgl
 import gin
-import graph_tfds.graphs  # pylint: disable=unused-import
 import numpy as np
 import scipy.sparse as sp
 import stfu.ops
 import tensorflow as tf
-import tensorflow_datasets as tfds
+import wget
 
+from graph_tf.data.data_types import DataSplit
 from graph_tf.data.transforms import transformed
-from graph_tf.data.types import DataSplit
+from graph_tf.utils import scipy_utils
 from graph_tf.utils.graph_utils import get_largest_component_indices
 from graph_tf.utils.ops import indices_to_mask, unique_ravelled
+from graph_tf.utils.os_utils import get_dir
 
 register = functools.partial(gin.register, module="gtf.data")
 
@@ -26,9 +28,9 @@ class SemiSupervisedSingle:
     node_features: tp.Union[tf.Tensor, tf.SparseTensor, np.ndarray]  # [N, F]
     adjacency: tf.SparseTensor  # [N, N]
     labels: tf.Tensor  # [N]
-    train_ids: tf.Tensor  # [n_train << N]
-    validation_ids: tf.Tensor  # [n_eval << N]
-    test_ids: tf.Tensor  # [n_test < N]
+    train_ids: tp.Optional[tf.Tensor]  # [n_train << N]
+    validation_ids: tp.Optional[tf.Tensor]  # [n_eval << N]
+    test_ids: tp.Optional[tf.Tensor]  # [n_test < N]
 
     @property
     def num_classes(self) -> int:
@@ -43,14 +45,14 @@ class SemiSupervisedSingle:
         return self.node_features.shape[0]
 
     def __post_init__(self):
-        self.node_features.shape.assert_has_rank(2)
-        assert self.node_features.dtype.is_floating
-        self.adjacency.shape.assert_has_rank(2)
+        assert len(self.node_features.shape) == 2, self.node_features.shape
+        assert len(self.adjacency.shape) == 2, self.adjacency.shape
         assert self.adjacency.shape[0] == self.adjacency.shape[1], self.adjacency.shape
 
         for ids in (self.train_ids, self.validation_ids, self.test_ids):
-            ids.shape.assert_has_rank(1)
-            assert ids.dtype.is_integer
+            if ids is not None:
+                ids.shape.assert_has_rank(1)
+                assert ids.dtype.is_integer
 
 
 class EdgeData(tp.NamedTuple):
@@ -77,7 +79,7 @@ class AutoencoderData(tp.NamedTuple):
     test_weights: tp.Optional[tf.Tensor]  # [num_nodes**2]
 
 
-def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
+def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor) -> SemiSupervisedSingle:
     indices = tf.sort(tf.convert_to_tensor(indices, tf.int64))
     adj = single.adjacency
     adj = stfu.ops.gather(adj, indices, axis=0)
@@ -88,6 +90,8 @@ def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
     table = tf.lookup.StaticHashTable(init, default_value)
 
     def lookup(ids):
+        if ids is None:
+            return None
         ids = table.lookup(ids)
         return tf.boolean_mask(ids, ids != default_value)
 
@@ -95,7 +99,7 @@ def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
     if isinstance(node_features, tf.SparseTensor):
         node_features = stfu.ops.gather(node_features, indices, axis=0)
     else:
-        node_features = (tf.gather(node_features, indices, axis=0),)
+        node_features = tf.gather(node_features, indices, axis=0)
 
     return SemiSupervisedSingle(
         node_features,
@@ -109,7 +113,7 @@ def subgraph(single: SemiSupervisedSingle, indices: tf.Tensor):
 
 def get_largest_component(
     single: SemiSupervisedSingle, directed: bool = True, connection="weak"
-):
+) -> SemiSupervisedSingle:
     indices = get_largest_component_indices(
         single.adjacency, directed=directed, connection=connection
     )
@@ -176,6 +180,72 @@ def preprocess_classification_single(
         adjacency_transform=adjacency_transform,
     )
     return to_classification_split(data)
+
+
+def random_classification_split(
+    labels: tf.Tensor,
+    samples_per_class: tp.Sequence[int],
+    num_classes: tp.Optional[int] = None,
+    balanced: bool = True,
+    seed: tp.Optional[int] = None,
+) -> tp.Sequence[tf.Tensor]:
+    if num_classes is None:
+        num_classes = int(tf.reduce_max(labels)) + 1
+    num_nodes = tf.shape(labels, out_type=tf.int64)[0]
+
+    rng = (
+        tf.random.get_global_generator()
+        if seed is None
+        else tf.random.Generator.from_seed(seed)
+    )
+
+    def split(indices: tf.Tensor, samples_per_class: tp.Sequence[int]):
+        r = rng.uniform_full_int(tf.shape(indices, tf.int64))
+        i = tf.argsort(r)
+        indices = tf.gather(indices, i)
+        samples_per_class = [
+            *samples_per_class,
+            indices.shape[0] - sum(samples_per_class),
+        ]
+        return tf.split(indices, samples_per_class)
+
+    if balanced:
+        indices = tf.dynamic_partition(
+            tf.range(num_nodes), tf.cast(labels, tf.int32), num_classes
+        )
+        class_indices = [split(ind, samples_per_class) for ind in indices]
+        split_ids = (
+            tf.concat(split_indices, 0) for split_indices in zip(*class_indices)
+        )
+    else:
+        # not artificially balanced
+        samples_per_class = [s * num_classes for s in samples_per_class]
+        split_ids = split(tf.range(num_nodes, dtype=tf.int64), samples_per_class)
+    return tuple(tf.sort(si) for si in split_ids)
+
+
+@register
+def with_random_split_ids(
+    data: SemiSupervisedSingle,
+    train_samples_per_class: int,
+    validation_samples_per_class: int,
+    seed: tp.Optional[int] = None,
+    balanced: bool = True,
+) -> SemiSupervisedSingle:
+    train_ids, validation_ids, test_ids = random_classification_split(
+        data.labels,
+        (train_samples_per_class, validation_samples_per_class),
+        balanced=balanced,
+        seed=seed,
+    )
+    return SemiSupervisedSingle(
+        data.node_features,
+        data.adjacency,
+        data.labels,
+        train_ids,
+        validation_ids,
+        test_ids,
+    )
 
 
 @register
@@ -451,14 +521,6 @@ def random_features(
     return tf.random.normal((num_nodes, size))
 
 
-def _get_dir(data_dir: tp.Optional[str], environ: str, default: tp.Optional[str]):
-    if data_dir is None:
-        data_dir = os.environ.get(environ, default)
-    if data_dir is None:
-        return None
-    return os.path.expanduser(os.path.expandvars(data_dir))
-
-
 def _load_dgl_graph(dgl_example, make_symmetric=False) -> tf.SparseTensor:
     r, c = (x.numpy() for x in dgl_example.edges())
     shape = (dgl_example.num_nodes(),) * 2
@@ -485,49 +547,149 @@ def _load_dgl_graph(dgl_example, make_symmetric=False) -> tf.SparseTensor:
 def get_data(name: str, **kwargs) -> SemiSupervisedSingle:
     if name.startswith("ogbn-"):
         return ogbn_data(name, **kwargs)
-    return citations_data(name)
+    if name.startswith("bojchevski-"):
+        return bojchevski_data(name, **kwargs)
+    if name in _dgl_constructors:
+        return dgl_data(name, **kwargs)
+    raise NotImplementedError(f"Unrecognized data '{name}'")
+
+
+_dgl_constructors = {
+    "cora": dgl.data.CoraGraphDataset,
+    "pubmed": dgl.data.PubmedGraphDataset,
+    "citeseer": dgl.data.CiteseerGraphDataset,
+    "amazon/computer": dgl.data.AmazonCoBuyComputerDataset,
+    "amazon/photo": dgl.data.AmazonCoBuyPhotoDataset,
+    "coauthor/physics": dgl.data.CoauthorPhysicsDataset,
+    "coauthor/cs": dgl.data.CoauthorCSDataset,
+    "cora-full": dgl.data.CoraFullDataset,
+}
+
+
+def _load_dgl_example(
+    dgl_example, make_symmetric=False, sparse_features=False
+) -> SemiSupervisedSingle:
+    feat, label = (dgl_example.ndata[k].numpy() for k in ("feat", "label"))
+    feat = (
+        tf.sparse.from_dense(feat)
+        if sparse_features
+        else tf.convert_to_tensor(feat, tf.float32)
+    )
+    label = tf.convert_to_tensor(label, tf.int64)
+    train_ids, validation_ids, test_ids = (
+        tf.squeeze(tf.where(dgl_example.ndata[k].numpy()), axis=1)
+        if k in dgl_example.ndata
+        else None
+        for k in ("train_mask", "val_mask", "test_mask")
+    )
+    adj = _load_dgl_graph(dgl_example, make_symmetric=make_symmetric)
+    return SemiSupervisedSingle(feat, adj, label, train_ids, validation_ids, test_ids)
 
 
 @register
-def citations_data(name: str = "cora") -> SemiSupervisedSingle:
-    """
-    Get semi-supervised citations data.
+def bojchevski_data(
+    name: str,
+    data_dir: tp.Optional[str] = None,
+    make_symmetric: bool = True,
+    sparse_features: bool = False,
+    device: str = "/cpu:0",
+) -> SemiSupervisedSingle:
+    with tf.device(device):
+        return _bojchevski_data(
+            name=name,
+            data_dir=data_dir,
+            make_symmetric=make_symmetric,
+            sparse_features=sparse_features,
+        )
 
-    Args:
-        name: one of "cora", "cite_seer", "pub_med", or a registered tfds builder name
-            with the same element spec.
-        largest_component_only: if True, returns the subgraph associated with the
-            largest connected component.
-    """
-    dataset = tfds.load(name)
-    if isinstance(dataset, dict):
-        if len(dataset) == 1:
-            (dataset,) = dataset.values()
-        else:
-            raise ValueError(
-                f"tfds builder {name} had more than 1 split ({sorted(dataset.keys())})."
-                " Please use 'name/split'"
+
+def _bojchevski_data(
+    name: str,
+    data_dir: tp.Optional[str] = None,
+    make_symmetric: bool = True,
+    sparse_features: bool = False,
+) -> SemiSupervisedSingle:
+    if name.startswith("bojchevski-"):
+        name = name[len("bojchevski-") :]
+    assert name in ("cora-full", "pubmed", "reddit", "mag-coarse"), name
+    raw_dir = os.path.join(
+        get_dir(data_dir, "GTF_DATA_DIR", "~/graph-tf-data"), "bojchevski"
+    )
+    os.makedirs(raw_dir, exist_ok=True)
+    path = os.path.join(raw_dir, f"{name}.npz")
+    if not os.path.exists(path):
+        if name in ("cora-full", "pubmed"):
+            url_name = name.replace(r"-", "_")
+            url = (
+                "https://github.com/TUM-DAML/pprgo_pytorch/raw/master/data/"
+                f"{url_name}.npz"
             )
-    assert dataset.cardinality() == 1
-    element = dataset.get_single_element()
-    graph = element["graph"]
-    links = graph["links"]
-    features = graph["node_features"]
-    labels = element["node_labels"]
-    train_ids = element["train_ids"]
-    validation_ids = element["validation_ids"]
-    test_ids = element["test_ids"]
+        elif name == "reddit":
+            url = "https://figshare.com/ndownloader/files/23742119"
+        elif name == "mag-coarse":
+            url = "https://figshare.com/ndownloader/files/24045741"
+        else:
+            raise NotImplementedError(name)
+        print(f"Downloading bojchevski-{name} data...")
+        wget.download(url, path)
+    data_dict = np.load(path)
 
-    adjacency = tf.SparseTensor(
-        links,
-        tf.ones((tf.shape(links)[0],), dtype=tf.float32),
-        (tf.shape(features, tf.int64)[0],) * 2,
-    )
+    def csr_to_tf(data, indices, indptr, shape, make_symmetric: bool):
+        data = data.astype(np.float32)
+        csr = sp.csr_matrix((data, indices, indptr), shape=shape)
+        if make_symmetric:
+            csr = (csr + csr.T) / 2
+            csr = csr.astype(np.float32)
+        out = scipy_utils.to_tf(csr)
+        return out
 
-    out = SemiSupervisedSingle(
-        features, adjacency, labels, train_ids, validation_ids, test_ids
+    if name in ("cora-full", "pubmed", "mag-coarse"):
+
+        def load_sparse(prefix: str, make_symmetric: bool):
+            indices, indptr, shape, data = (
+                data_dict[f"{prefix}.{suffix}"]
+                for suffix in (
+                    "indices",
+                    "indptr",
+                    "shape",
+                    "data",
+                )
+            )
+            return csr_to_tf(data, indices, indptr, shape, make_symmetric)
+
+        adj = load_sparse("adj_matrix", make_symmetric=make_symmetric)
+        features = load_sparse("attr_matrix", make_symmetric=False)
+        if not sparse_features and isinstance(features, tf.SparseTensor):
+            features = tf.sparse.to_dense(features)
+    elif name == "reddit":
+        if sparse_features:
+            raise ValueError("reddit features are dense, but sparse_features requested")
+        features = tf.convert_to_tensor(data_dict["attr_matrix"], tf.float32)
+        adj = csr_to_tf(
+            data_dict["adj_data"],
+            data_dict["adj_indices"],
+            data_dict["adj_indptr"],
+            data_dict["adj_shape"],
+            make_symmetric=make_symmetric,
+        )
+    else:
+        raise NotImplementedError(name)
+    labels = tf.convert_to_tensor(data_dict["labels"], dtype=tf.int64)
+    return SemiSupervisedSingle(features, adj, labels, None, None, None)
+
+
+@register
+def dgl_data(
+    name: str,
+    data_dir: tp.Optional[str] = None,
+    make_symmetric: bool = True,
+    sparse_features: bool = False,
+) -> SemiSupervisedSingle:
+    raw_dir = get_dir(data_dir, "DGL_DATA", None)
+    ds = _dgl_constructors[name](raw_dir=raw_dir)
+    return _load_dgl_example(
+        ds[0], make_symmetric=make_symmetric, sparse_features=sparse_features
     )
-    return out
 
 
 @register
@@ -538,7 +700,7 @@ def ogbn_data(
 ) -> SemiSupervisedSingle:
     import ogb.nodeproppred  # pylint: disable=import-outside-toplevel
 
-    root_dir = _get_dir(data_dir, "OGB_DATA", "~/ogb")
+    root_dir = get_dir(data_dir, "OGB_DATA", "~/ogb")
     if not name.startswith("ogbn-"):
         name = f"ogbn-{name}"
 
@@ -595,6 +757,12 @@ def asymproj_data_v2(
         SparseTensorTransform, tp.Iterable[SparseTensorTransform]
     ] = (),
 ) -> AutoencoderDataV2:
+    # pylint: disable=import-outside-toplevel
+    import graph_tfds.graphs  # pylint: disable=unused-import
+    import tensorflow_datasets as tfds
+
+    # pylint: enable=import-outside-toplevel
+
     example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
     train_pos = example["train_pos"]
     train_neg = example["train_neg"]
@@ -628,6 +796,12 @@ def asymproj_data(
         SparseTensorTransform, tp.Iterable[SparseTensorTransform]
     ] = (),
 ) -> AutoencoderData:
+    # pylint: disable=import-outside-toplevel
+    import graph_tfds.graphs  # pylint: disable=unused-import
+    import tensorflow_datasets as tfds
+
+    # pylint: enable=import-outside-toplevel
+
     example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
     train_pos = example["train_pos"]
     train_neg = example["train_neg"]

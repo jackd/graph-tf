@@ -1,0 +1,7 @@
+include 'gtf_config/data/dgl/photo.gin'
+include 'igcn/config/utils/random-splits.gin'
+
+lr = 1e-2
+patience = 100
+epochs = 2000
+largest_component_only = True

@@ -1,0 +1,8 @@
+# based on parameters from dagnn
+include "mlp/config/bojchevski/pubmed.gin"
+
+weight_decay = 5e-3
+epsilon = 0.1
+dropout_rate = 0.5
+units = [64]
+lr = 1e-2

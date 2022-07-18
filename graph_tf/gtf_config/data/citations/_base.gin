@@ -1,6 +1,1 @@
-import graph_tf.data.single
-
-include "gtf_config/data/classification.gin"
-
-base_data = @gtf.data.citations_data()
-gtf.data.citations_data.name = %problem
+include "gtf_config/data/dgl/_base.gin"

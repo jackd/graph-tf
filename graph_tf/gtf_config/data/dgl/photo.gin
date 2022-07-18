@@ -1,0 +1,4 @@
+include "gtf_config/data/dgl/_base.gin"
+
+problem = "amazon/photo"
+num_classes = 8
