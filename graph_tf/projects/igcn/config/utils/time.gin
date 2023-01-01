@@ -1,0 +1,16 @@
+import graph_tf.configurables
+import graph_tf.utils.callbacks
+
+callbacks = [
+    @gtf.utils.callbacks.MeanStepTimer(),
+]
+
+gtf.utils.callbacks.MeanStepTimer.start_step = 10
+gtf.utils.callbacks.MeanStepTimer.stop_step = 110
+
+skip_validation = True
+skip_test = True
+force_normal = True
+verbose = False
+epochs = 111
+num_trials = 1

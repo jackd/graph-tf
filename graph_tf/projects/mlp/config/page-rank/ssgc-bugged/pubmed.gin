@@ -1,0 +1,4 @@
+include "mlp/config/pubmed.gin"
+include "mlp/config/page-rank/ssgc-bugged/_base.gin"
+
+l2_reg = 1e-5

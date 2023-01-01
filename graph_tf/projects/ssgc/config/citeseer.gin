@@ -1,0 +1,8 @@
+include "gtf_config/data/citations/citeseer.gin"
+include "ssgc/config/_base.gin"
+
+epochs = 150
+lr = 0.2
+alpha = 0.05
+weight_decay = 1e-4
+degree = 16

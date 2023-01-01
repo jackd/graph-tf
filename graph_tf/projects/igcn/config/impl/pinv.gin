@@ -1,0 +1,27 @@
+include "igcn/config/impl/lp.gin"
+
+adjacency_transform = None
+
+train_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators
+validation_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators
+test_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators
+
+# gtf.igcn.data.get_pseudo_inverse_propagators.rank = %rank
+# rank = 200
+
+gtf.igcn.data.get_pseudo_inverse_propagators.max_iter = %max_iter
+gtf.igcn.data.get_pseudo_inverse_propagators.tol = %tol
+gtf.igcn.data.get_pseudo_inverse_propagators.show_progress = %show_progress
+gtf.igcn.data.get_pseudo_inverse_propagators.preprocess = %preprocess
+gtf.igcn.data.get_pseudo_inverse_propagators.rescaled = %rescaled
+gtf.igcn.data.get_pseudo_inverse_propagators.diag_always_one = %diag_always_one
+
+rescaled = True
+diag_always_one = False
+
+# train_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators_disjoint_merge
+# validation_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators_disjoint_merge
+# test_propagator_fn = @gtf.igcn.data.get_pseudo_inverse_propagators_disjoint_merge
+#
+# gtf.igcn.data.get_pseudo_inverse_propagators_disjoint_merge.max_iter = %max_iter
+# gtf.igcn.data.get_pseudo_inverse_propagators_disjoint_merge.tol = %tol

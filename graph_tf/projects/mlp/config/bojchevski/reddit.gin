@@ -4,3 +4,4 @@ include "gtf_config/data/bojchevski/reddit.gin"
 include "mlp/config/bojchevski/_base.gin"
 
 epsilon = 0.5
+verbose = True

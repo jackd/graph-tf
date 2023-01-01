@@ -1,0 +1,27 @@
+import graph_tf.projects.ssgc.transforms
+import graph_tf.utils.torch_compat
+include "mlp/config/utils/_base.gin"
+
+kernel_regularizer = None
+
+tf.keras.optimizers.Adam.gradient_transformers = [@gtf.utils.weight_decay_transformer()]
+gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
+
+dropout_rate = 0
+input_dropout_rate = 0
+units = ()
+
+dual_features = (
+    @gtf.ssgc.transforms.ssgc_transform,
+)
+
+gtf.ssgc.transforms.ssgc_transform.alpha = %alpha
+gtf.ssgc.transforms.ssgc_transform.degree = %degree
+gtf.ssgc.transforms.ssgc_transform.renormalized = %renormalized
+
+patience = 99999
+monitor = 'val_acc'
+mode = 'max'
+
+include_transformed_features = False
+renormalized = True

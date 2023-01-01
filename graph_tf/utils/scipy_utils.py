@@ -2,6 +2,7 @@ import typing as tp
 
 import numpy as np
 import scipy.sparse as sp
+import scipy.sparse.linalg as la
 import tensorflow as tf
 from scipy.sparse.linalg.eigen.arpack import eigsh
 
@@ -58,3 +59,21 @@ def to_tf(sp_matrix: tp.Union[sp.coo_matrix, sp.csr_matrix]) -> tf.SparseTensor:
     coo: sp.coo_matrix = sp_matrix.tocoo()
     row, col = (tf.convert_to_tensor(x, tf.int64) for x in (coo.row, coo.col))
     return tf.SparseTensor(tf.stack((row, col), axis=1), coo.data, coo.shape)
+
+
+class ShiftedLinearOperator(la.LinearOperator):
+    """Shifts eigenvalues with vectors `u` to `old_eigenvalue + scalar`."""
+
+    def __init__(self, op: la.LinearOperator, u: np.ndarray, scalar: float):
+        self.op = la.aslinearoperator(op)
+        self.u = u
+        self.scalar = scalar
+        assert op.shape == (u.shape[0], u.shape[0]), (op.shape, u.shape[0])
+        assert u.ndim == 2, u.shape
+        super().__init__(shape=op.shape, dtype=op.dtype)
+
+    def _matvec(self, x):
+        return self.op.matvec(x) + self.scalar * self.u @ (self.u.T @ x)
+
+    def _matmul(self, x):
+        return self.op.matmul(x) + self.scalar * self.u @ (self.u.T @ x)

@@ -28,8 +28,9 @@ class GraphConvolution(_base_layers.ConvolutionBase):
         kernel_initializer=None,
         bias_initializer="zeros",
         variant: bool = False,
-        **kwargs
+        **kwargs,
     ):
+
         if kernel_initializer is None:
             kernel_initializer = tf.keras.initializers.VarianceScaling(
                 scale=1 / 3, mode="fan_out", distribution="uniform"
@@ -53,7 +54,12 @@ class GraphConvolution(_base_layers.ConvolutionBase):
     def _kernel_shape(self, input_shape) -> tp.Tuple[int, ...]:
         return (input_shape[-1][-1], self.filters)
 
-    def call(self, inputs: GraphConvolutionInput):
+    def build(self, input_shape):
+        if self.built:
+            return
+        super().build(input_shape)
+
+    def call(self, inputs: GraphConvolutionInput, training=False):
         adjacency, features, features0 = inputs
         x = graph_conv(
             adjacency,

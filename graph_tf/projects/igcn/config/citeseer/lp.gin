@@ -1,6 +1,7 @@
 include "igcn/config/impl/lp.gin"
 include "igcn/config/citeseer/_base.gin"
 
-weight_decay = 2e-2
+l2_reg = 1e-2
 epsilon = 0.1
 dropout_rate = 0.5
+renormalized = True

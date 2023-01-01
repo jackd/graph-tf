@@ -1,0 +1,7 @@
+include 'gtf_config/data/dgl/computer.gin'
+include 'mlp/config/utils/_random_splits_base.gin'
+
+largest_component_only = True
+
+epochs = 3000
+patience = 300

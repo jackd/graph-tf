@@ -4,8 +4,8 @@ import gin
 import tensorflow as tf
 
 from graph_tf.projects.dagnn.layers import GatedSum
-from graph_tf.utils import torch_compat
 from graph_tf.utils.layers import Krylov
+from graph_tf.utils.models import dropout
 
 
 @gin.configurable(module="gtf.dagnn")
@@ -19,7 +19,8 @@ def dagnn_citations(
     input_dropout_rate: tp.Optional[float] = None,
     normalization: tp.Optional[tp.Callable] = None,
     activation="relu",
-):
+    simplified: bool = False,
+) -> tf.keras.Model:
     activation = tf.keras.activations.get(activation)
     if input_dropout_rate is None:
         input_dropout_rate = dropout_rate
@@ -32,31 +33,25 @@ def dagnn_citations(
 
     reg = tf.keras.regularizers.l2(l2_reg) if l2_reg else None
     kwargs = dict(
-        kernel_initializer=torch_compat.linear_kernel_initializer(),
         kernel_regularizer=reg,
         bias_regularizer=reg,
     )
 
-    x = tf.keras.layers.Dropout(input_dropout_rate)(x)
+    x = dropout(x, input_dropout_rate)
     x = tf.keras.layers.Dense(
         hidden_size,
-        bias_initializer=torch_compat.linear_bias_initializer(x.shape[-1]),
         **kwargs,
     )(x)
     if normalization:
         x = normalization(x)
     x = activation(x)
-    x = tf.keras.layers.Dropout(dropout_rate)(x)
-    logits = tf.keras.layers.Dense(
-        num_classes,
-        bias_initializer=torch_compat.linear_bias_initializer(x.shape[-1]),
-        **kwargs,
-    )(x)
+    x = dropout(x, dropout_rate)
+    logits = tf.keras.layers.Dense(num_classes, **kwargs)(x)
     logits = Krylov(num_propagations)([a, logits])
-    logits = GatedSum(
-        bias_initializer=torch_compat.linear_bias_initializer(logits.shape[-1]),
-        **kwargs,
-    )(logits)
+    if simplified:
+        logits = tf.reduce_sum(logits, axis=1)
+    else:
+        logits = GatedSum(**kwargs)(logits)
     if ids is not None:
         logits = tf.gather(logits, ids, axis=0)
     model = tf.keras.Model(inputs, logits)

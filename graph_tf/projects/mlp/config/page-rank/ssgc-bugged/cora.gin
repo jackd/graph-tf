@@ -1,0 +1,4 @@
+include "mlp/config/cora.gin"
+include "mlp/config/page-rank/ssgc-bugged/_base.gin"
+
+l2_reg = 5e-6

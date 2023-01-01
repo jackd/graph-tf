@@ -1,6 +1,7 @@
 include "igcn/config/impl/lp.gin"
 include "igcn/config/cs/_base.gin"
 
-weight_decay = 0
-epsilon = 0.5
+l2_reg = 0
+epsilon = 0.2
 dropout_rate = 0.8
+renormalized = True

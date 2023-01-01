@@ -62,7 +62,7 @@ def _get_page_rank_cache(
     epsilon: tp.Union[float, tp.Iterable[float]],
     data_fn: tp.Callable[[], TransitiveData],
     max_iter: int = 100,
-    tol: float = 1e-3,
+    tol: float = 1e-2,
     show_progress: bool = True,
     memmap: bool = True,
     splits: tp.Sequence[str] = ("train", "validation", "test"),
@@ -122,7 +122,6 @@ def _get_page_rank_cache(
                     ]
                     if eps == 1.0:
                         # extra branch to avoid loading data.adjacency if lazily loaded
-                        print(f"Caching original features, epsilon = {eps}")
                         for split, dst, ids in zip(splits, dst_list, ids_list):
                             if show_progress:
                                 ids = tqdm.tqdm(ids, desc=f"Copying {split} features")
@@ -130,7 +129,6 @@ def _get_page_rank_cache(
                             write_block_rows(feats_it, dst, block_size=512)
 
                     else:
-                        print(f"Caching page-rank propagated features, epsilon={eps}")
                         src = page_rank_propagate(
                             data.adjacency,
                             features,
@@ -143,7 +141,7 @@ def _get_page_rank_cache(
                             src = tqdm.tqdm(
                                 src,
                                 total=features.shape[1],
-                                desc=f"Computing page rank, epsilon={epsilon}",
+                                desc=f"Computing page rank, epsilon={eps}",
                             )
                             for i, col in enumerate(src):
                                 for dst, ids in zip(dst_list, ids_list):
@@ -270,9 +268,15 @@ def cached_page_rank_splits(
 
 
 if __name__ == "__main__":
+    import sys
+
     from graph_tf.data.transitive import cached_ogbn_papers100m
     from graph_tf.utils.os_utils import get_dir
 
+    epsilon = [float(arg) for arg in sys.argv[1:]]
+    if len(epsilon) == 0:
+        print("No epsilon provided. Usage: `python cache.py *eps")
+        exit()
     cache_path = os.path.join(
         get_dir(None, "GTF_DATA_DIR", "~/graph-tf-data"),
         "page-rank",
@@ -282,7 +286,7 @@ if __name__ == "__main__":
     split = cached_page_rank_splits(
         cache_path=cache_path,
         data_fn=data_fn,
-        epsilon=(0.1, 1.0),
+        epsilon=epsilon,
         max_iter=1000,
         tol=1e-2,
         batch_size=64,

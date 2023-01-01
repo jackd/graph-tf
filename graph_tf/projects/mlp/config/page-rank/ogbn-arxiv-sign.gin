@@ -1,0 +1,14 @@
+# based on DGL sign
+import graph_tf.utils.models
+
+include "mlp/config/ogbn-arxiv.gin"
+include "mlp/config/utils/page-rank.gin"
+
+include_transformed_features = False
+show_progress = False
+
+include_transformed_features=False
+units = (1024, 512)
+dropout_rate = 0.5
+epsilon = [0.1]
+lr = 2e-3

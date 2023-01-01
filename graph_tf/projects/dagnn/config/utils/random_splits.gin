@@ -1,0 +1,11 @@
+include "gtf_config/data/random_splits.gin"
+
+preprocessed_data = @gin.singleton()
+preprocessed_data/gin.singleton.constructor = @gtf.data.preprocess_base
+
+gtf.data.preprocess_base.data = %base_data
+gtf.data.preprocess_base.features_transform = %features_transform
+gtf.data.preprocess_base.adjacency_transform = %adjacency_transform
+gtf.data.preprocess_base.largest_component_only = %largest_component_only
+
+largest_component_only = False

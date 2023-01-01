@@ -1,6 +1,6 @@
 import graph_tf.projects.dagnn.callbacks
 import graph_tf.projects.dagnn.models
-import graph_tf.utils.torch_compat
+import graph_tf.utils.callbacks
 
 include "gtf_config/data/classification_single.gin"
 
@@ -16,32 +16,34 @@ features_transform = [
 
 gtf.data.transforms.to_format.fmt = "dense"
 
-
 model_fn = @gtf.dagnn.dagnn_citations
 
 gtf.dagnn.dagnn_citations.num_classes = %num_classes
 gtf.dagnn.dagnn_citations.dropout_rate = %dropout_rate
 gtf.dagnn.dagnn_citations.num_propagations = %num_propagations
 gtf.dagnn.dagnn_citations.hidden_size = %hidden_size
+gtf.dagnn.dagnn_citations.l2_reg = %l2_reg
+gtf.dagnn.dagnn_citations.simplified = %simplified
 
-# callbacks = [@gtf.dagnn.EarlyStopping()]
-# gtf.dagnn.EarlyStopping.patience = %patience
-# gtf.dagnn.EarlyStopping.monitor = %monitor
+# callbacks = [@tf.keras.callbacks.EarlyStopping()]
+# tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+# tf.keras.callbacks.EarlyStopping.monitor = %monitor
+# tf.keras.callbacks.EarlyStopping.patience = %patience
 
-callbacks = [@tf.keras.callbacks.EarlyStopping()]
-tf.keras.callbacks.EarlyStopping.restore_best_weights = True
-tf.keras.callbacks.EarlyStopping.monitor = %monitor
-tf.keras.callbacks.EarlyStopping.patience = %patience
+callbacks = [@gtf.utils.callbacks.EarlyStoppingV2()]
+gtf.utils.callbacks.EarlyStoppingV2.restore_best_weights = True
+gtf.utils.callbacks.EarlyStoppingV2.monitor = %monitor
+gtf.utils.callbacks.EarlyStoppingV2.mode = %mode
+gtf.utils.callbacks.EarlyStoppingV2.patience = %patience
 
 optimizer = @tf.keras.optimizers.Adam()
 tf.keras.optimizers.Adam.learning_rate = %lr
-tf.keras.optimizers.Adam.epsilon = 1e-8  # pytorch default
 
-tf.keras.optimizers.Adam.gradient_transformers = [@gtf.utils.weight_decay_transformer()]
-gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
 
 lr = 1e-2
 hidden_size = 64
 epochs = 1000
 monitor = 'val_cross_entropy'
+mode = 'min'
 patience = 100
+simplified = False

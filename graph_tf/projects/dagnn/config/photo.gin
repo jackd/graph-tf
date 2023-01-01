@@ -1,0 +1,8 @@
+include 'gtf_config/data/dgl/photo.gin'
+include 'dagnn/config/_base.gin'
+include 'dagnn/config/utils/random_splits.gin'
+
+largest_component_only = True
+l2_reg = 2.5e-4
+dropout_rate = 0.5
+num_propagations = 5

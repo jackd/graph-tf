@@ -3,7 +3,7 @@ import graph_tf.configurables.core
 problem = "pubmed"
 num_classes = 3
 epsilon = 0.05
-weight_decay = 5e-3
+l2_reg = 5e-3
 dropout_rate = 0.8
 hidden_units = (64,)
 

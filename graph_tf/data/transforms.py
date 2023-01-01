@@ -3,11 +3,25 @@ import typing as tp
 
 import gin
 import numpy as np
-import scipy.sparse as sp
 import scipy.sparse.linalg as la
 import tensorflow as tf
 import tqdm
-from tflo.extras import LinearOperatorSparseMatrix
+from tflo.extras import LinearOperatorCGSolver, LinearOperatorSparseMatrix
+from tflo.matrix.core import (
+    CompositionMatrix,
+    DiagMatrix,
+    FullMatrix,
+    Matrix,
+    ScaledIdentityMatrix,
+    composition_matrix,
+)
+from tflo.matrix.extras import (
+    CGSolverMatrix,
+    ExponentialMatrix,
+    MappedMatrix,
+    ProgMatrix,
+    SparseMatrix,
+)
 
 from graph_tf.utils import scipy_utils
 from graph_tf.utils.graph_utils import (
@@ -100,22 +114,46 @@ def sparsify(
     return adj
 
 
-@configurable
-def normalized_laplacian(
-    x: tf.SparseTensor, symmetric: bool = True, shift: float = 0.0
-) -> tf.SparseTensor:
+@register
+def normalized_adjacency(x: tf.SparseTensor, symmetric: bool = True) -> tf.SparseTensor:
     d = tf.sparse.reduce_sum(x, axis=0)
     if symmetric:
         d = tf.math.rsqrt(d)
         row, col = tf.unstack(x.indices, axis=1)
         x = x.with_values(
-            -x.values * tf.gather(d, row, axis=0) * tf.gather(d, col, axis=0)
+            x.values * tf.gather(d, row, axis=0) * tf.gather(d, col, axis=0)
+        )
+    else:
+        x = x.with_values(x.values / tf.gather(d, x.indices[:, 0], axis=0))
+    return x
+
+
+@configurable
+def normalized_laplacian(
+    x: tf.SparseTensor,
+    symmetric: bool = True,
+    shift: float = 0.0,
+    diag_always_one: bool = True,
+) -> tf.SparseTensor:
+    d = tf.sparse.reduce_sum(x, axis=0)
+    if symmetric:
+        d_rsqrt = tf.math.rsqrt(d)
+        row, col = tf.unstack(x.indices, axis=1)
+        x = x.with_values(
+            -x.values
+            * tf.gather(d_rsqrt, row, axis=0)
+            * tf.gather(d_rsqrt, col, axis=0)
         )
     else:
         x = x.with_values(-x.values / tf.gather(d, x.indices[:, 0], axis=0))
-    return tf.sparse.add(
-        tf.sparse.eye(x.dense_shape[0], dtype=x.dtype) * (1 + shift), x
-    )
+    diag = tf.sparse.eye(x.dense_shape[0], dtype=x.dtype)
+    if not diag_always_one:
+        diag = diag.with_values(
+            tf.where(
+                d == 0, tf.zeros_like(d, dtype=x.dtype), tf.ones_like(d, dtype=x.dtype)
+            )
+        )
+    return tf.sparse.add(diag.with_values(diag.values * (1 + shift)), x)
 
 
 @configurable
@@ -216,94 +254,351 @@ def random_projection(
     return tf.linalg.matmul(features, R)
 
 
+# def _page_rank_propagate(
+#     A: tf.SparseTensor,
+#     epsilon: float,
+#     x: tf.Tensor,
+#     x0: tf.Tensor,
+#     tol: float,
+#     max_iter: int,
+#     show_progress: bool,
+# ) -> tf.Tensor:
+#     if epsilon == 1:
+#         return x
+#     assert 0 < epsilon < 1, epsilon
+#     I = tf.sparse.eye(A.shape[0], dtype=A.dtype)
+#     L = tf.sparse.add(I, A.with_values(A.values * (epsilon - 1)))
+
+#     if show_progress:
+#         L = scipy_utils.to_scipy(L)
+
+#         sol = np.zeros(x.shape, dtype=x.dtype.as_numpy_dtype)
+#         for i in tqdm.trange(x.shape[1], desc="Computing page-rank vectors"):
+#             s, _ = la.cg(L, x[:, i], x0=x0, tol=tol, maxiter=max_iter)
+#             sol[:, i] = s
+
+#         return tf.convert_to_tensor(epsilon * sol, x.dtype)
+
+#     L = LinearOperatorSparseMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+
+#     sol = LinearOperatorCGSolver(L, x0=x0, tol=tol, max_iter=max_iter) @ x
+#     return epsilon * sol
+
+
+def get_normalized_adjacency(
+    A: tf.SparseTensor, symmetric: bool = True
+) -> tp.Tuple[tf.SparseTensor, tf.Tensor]:
+    d = tf.sparse.reduce_sum(A, axis=1)
+    i, j = tf.unstack(A.indices, axis=1)
+    if symmetric:
+        # d_rsqrt = tf.where(d == 0, tf.zeros_like(d), tf.math.rsqrt(d))
+        d_rsqrt = tf.math.rsqrt(d)
+        A = A.with_values(
+            A.values * tf.gather(d_rsqrt, i, axis=0) * tf.gather(d_rsqrt, j, axis=0)
+        )
+    else:
+        A = A.with_values(A.values * tf.gather(tf.math.reciprocal(d), i, axis=0))
+    tf.debugging.assert_all_finite(A.values, "normalized values not finite")
+    return A, d
+
+
+def _cg_solver_matrix(
+    L: tp.Union[tf.SparseTensor, Matrix],
+    *,
+    show_progress: bool = False,
+    parallel_iterations: tp.Optional[int] = None,
+    **kwargs,
+):
+    if isinstance(L, tf.SparseTensor):
+        L = SparseMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+    elif isinstance(L, tf.Tensor):
+        L = FullMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+    else:
+        assert isinstance(L, Matrix), type(L)
+        assert L.is_self_adjoint
+        assert L.is_positive_definite
+    solver = CGSolverMatrix(L, **kwargs)
+
+    if parallel_iterations and show_progress:
+        raise Exception("Cannot use both `parallel_iterations` and `show_progress`")
+
+    if parallel_iterations:
+        solver = MappedMatrix(solver, parallel_iterations)
+    if show_progress:
+        solver = ProgMatrix(solver)
+    return solver
+
+
+def heat_matrix(
+    A: tp.Union[tf.SparseTensor, Matrix],
+    *,
+    t: float = 1.0,
+    symmetric: bool = True,
+    renormalized: bool = False,
+    show_progress: bool = False,
+    preprocess: bool = False,
+) -> tp.Union[Matrix, tf.Tensor]:
+    if renormalized:
+        I = tf.sparse.eye(A.shape[0], dtype=A.dtype)
+        A = tf.sparse.add(A, I)
+    L = normalized_laplacian(A, symmetric=symmetric)
+    L = L.with_values(-t * L.values)
+    mat = ExponentialMatrix(SparseMatrix(L, is_self_adjoint=True))
+    if show_progress:
+        mat = ProgMatrix(mat)
+    if preprocess:
+        mat = mat.to_dense()
+    return mat
+
+
+@register
+def heat_propagate(
+    adj: tf.SparseTensor,
+    x: tf.Tensor,
+    t: tp.Union[float, tp.Iterable[float]],
+    symmetric: bool = True,
+    renormalized: bool = False,
+    show_progress: bool = True,
+) -> tf.Tensor:
+    if isinstance(t, (int, float)):
+        t = (t,)
+
+    features = [
+        heat_matrix(
+            adj,
+            t=ti,
+            show_progress=show_progress,
+            symmetric=symmetric,
+            renormalized=renormalized,
+        )
+        @ x
+        for ti in t
+    ]
+    if len(features) == 1:
+        return features[0]
+    return tf.concat(features, 1)
+
+
+def page_rank_matrix(
+    A: tp.Union[tf.SparseTensor, Matrix],
+    *,
+    epsilon: float = 0.1,
+    tol: float = 1e-5,
+    max_iter: int = 20,
+    symmetric: bool = True,
+    renormalized: bool = False,
+    show_progress: bool = False,
+    preprocess: bool = False,
+    parallel_iterations: tp.Optional[int] = None,
+    unscaled: bool = False,
+    rescale_factor: float = 1.0,
+) -> tp.Union[Matrix, tf.Tensor]:
+    if not unscaled:
+        rescale_factor *= epsilon
+    I = tf.sparse.eye(A.shape[0], dtype=A.dtype)
+    if renormalized:
+        A = tf.sparse.add(A, I)
+    if symmetric:
+        A = normalize_sparse(A, symmetric=True)
+        L = tf.sparse.add(I, A.with_values(A.values * (epsilon - 1)))
+        mat = _cg_solver_matrix(
+            L,
+            show_progress=show_progress,
+            tol=tol,
+            max_iter=max_iter,
+            parallel_iterations=parallel_iterations,
+        )
+        if rescale_factor != 1.0:
+            mat = ScaledIdentityMatrix(mat.shape[0], rescale_factor) @ mat
+    else:
+        d = tf.sparse.reduce_sum(A, axis=1)
+        disconnected = d == 0
+        ones = tf.ones_like(d)
+        # add self-loop for completely disconnected nodes
+        d = tf.where(disconnected, ones, d)
+        L = tf.sparse.add(I.with_values(d), A.with_values(A.values * (1 - epsilon)))
+        mat = _cg_solver_matrix(
+            L,
+            show_progress=show_progress,
+            parallel_iterations=parallel_iterations,
+            tol=tol,
+            max_iter=max_iter,
+        )
+        if rescale_factor != 1.0:
+            raise NotImplementedError
+            mat = CompositionMatrix(
+                (DiagMatrix(tf.where(disconnected, ones, ones * epsilon)), mat)
+            )
+
+    def _to_dense(mat: Matrix):
+
+        if isinstance(mat, CompositionMatrix):
+            # LinearOperatorComposition._to_dense implementation is terrible
+            return mat.operators[0] @ _to_dense(composition_matrix(*mat.operators[1:]))
+        return mat.to_dense()
+
+    if preprocess:
+        return _to_dense(mat)
+    return mat
+
+
 @register
 def page_rank_propagate(
     adj: tf.SparseTensor,
     x: tf.Tensor,
     epsilon: tp.Union[float, tp.Iterable[float]],
-    symmetric: bool = True,
     tol: float = 1e-5,
     max_iter: int = 1000,
+    show_progress: bool = True,
     parallel_iterations: tp.Optional[int] = None,
-    device: str = "/cpu:0",
+    renormalized: bool = False,
+    unscaled: bool = False,
+    rescale_factor: float = 1.0,
+) -> tf.Tensor:
+    if isinstance(epsilon, (int, float)):
+        epsilon = (epsilon,)
+
+    features = [
+        page_rank_matrix(
+            adj,
+            epsilon=eps,
+            tol=tol,
+            max_iter=max_iter,
+            show_progress=show_progress,
+            renormalized=renormalized,
+            unscaled=unscaled,
+            parallel_iterations=parallel_iterations,
+            rescale_factor=rescale_factor,
+        )
+        @ x
+        for eps in epsilon
+    ]
+    if len(features) == 1:
+        return features[0]
+    return tf.concat(features, 1)
+
+
+# @register
+# def page_rank_propagate(
+#     adj: tf.SparseTensor,
+#     x: tf.Tensor,
+#     epsilon: tp.Union[float, tp.Iterable[float]],
+#     tol: float = 1e-5,
+#     max_iter: int = 1000,
+#     show_progress: bool = True,
+# ) -> tf.Tensor:
+#     adj.shape.assert_has_rank(2)
+#     dtype = adj.dtype
+#     assert dtype.is_floating
+#     x = tf.convert_to_tensor(x, dtype=dtype)
+#     x.shape.assert_has_rank(2)
+#     row_sum = tf.sparse.reduce_sum(adj, axis=1)
+#     x0 = tf.sqrt(row_sum) / tf.reduce_sum(row_sum).numpy()
+#     adj = normalize_sparse(adj, symmetric=True)
+#     if isinstance(epsilon, float):
+#         epsilon = (epsilon,)
+#     else:
+#         assert len(epsilon) > 0
+
+#     out = [
+#         _page_rank_propagate(adj, eps, x, x0, tol, max_iter, show_progress)
+#         for eps in epsilon
+#     ]
+
+#     if len(out) == 1:
+#         return out[0]
+#     return tf.concat(  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
+#         out, axis=-1
+#     )
+
+
+def _page_rank_labels_propagate(
+    A: tf.SparseTensor,
+    epsilon: float,
+    x0: tf.Tensor,
+    labels: tf.Tensor,
+    num_classes: int,
+    train_ids: tf.Tensor,
+    tol: float,
+    max_iter: int,
+    show_progress: bool,
+) -> tf.Tensor:
+    assert 0 < epsilon < 1, epsilon
+    num_nodes = A.shape[0]
+    num_labels = train_ids.shape[0]
+    assert labels.shape == (num_labels,), (labels.shape, num_labels)
+    dtype = A.dtype
+    assert dtype.is_floating
+    I = tf.sparse.eye(num_nodes, dtype=dtype)
+    L = tf.sparse.add(I, A.with_values(A.values * (epsilon - 1)))
+    if show_progress:
+        L = scipy_utils.to_scipy(L)
+        labels = labels.numpy()
+        train_ids = train_ids.numpy()
+        out = np.zeros((num_nodes, num_classes), dtype=dtype.as_numpy_dtype)
+        for i in tqdm.trange(num_labels, desc="Computing label page-rank vectors"):
+            x = np.zeros((num_nodes,), dtype=dtype.as_numpy_dtype)
+            train_id = train_ids[i]
+            label = labels[i]
+            s, _ = la.cg(L, x, x0=x0, tol=tol, maxiter=max_iter)
+            s[train_id] = 0
+            out[:, label] += s
+
+        return tf.convert_to_tensor(epsilon * out, L.dtype)
+
+    L = LinearOperatorSparseMatrix(L, is_self_adjoint=True, is_positive_definite=True)
+    indices = tf.stack(
+        (train_ids, tf.range(num_labels, dtype=train_ids.dtype)), axis=-1
+    )
+    x = tf.scatter_nd(
+        indices,
+        tf.ones((num_labels,), dtype=dtype),
+        (num_nodes, num_labels),
+    )  # [N, L]
+    sol = LinearOperatorCGSolver(L, x0=x0, max_iter=max_iter, tol=tol) @ x  # [N, L]
+    diag = tf.gather_nd(sol, indices)  # [L]
+    solT = tf.transpose(sol)  # [L, N]
+    solT_reduced = tf.math.unsorted_segment_sum(
+        solT, tf.gather(labels, train_ids), num_classes
+    )  # [C, N]
+    sol_reduced = tf.transpose(solT_reduced)  # [N, C]
+    sol = sol_reduced - tf.scatter_nd(
+        tf.stack((train_ids, tf.cast(labels, train_ids.dtype)), axis=1),
+        diag,
+        (num_nodes, num_classes),
+    )
+    return epsilon * sol
+
+
+@register
+def page_rank_labels_propagate(
+    adj: tf.SparseTensor,
+    labels: tf.Tensor,
+    train_ids: tf.Tensor,
+    epsilon: tp.Union[float, tp.Iterable[float]],
+    tol: float = 1e-5,
+    max_iter: int = 1000,
     show_progress: bool = True,
 ) -> tf.Tensor:
     adj.shape.assert_has_rank(2)
     dtype = adj.dtype
     assert dtype.is_floating
-    num_nodes = adj.shape[0]
-    x = tf.convert_to_tensor(x, dtype=dtype)
-    x.shape.assert_has_rank(2)
-    I = tf.sparse.eye(num_nodes, dtype=dtype)
+    assert labels.shape == train_ids.shape, (labels.shape, train_ids.shape)
     row_sum = tf.sparse.reduce_sum(adj, axis=1)
     x0 = tf.sqrt(row_sum) / tf.reduce_sum(row_sum).numpy()
-    adj = normalize_sparse(adj, symmetric=symmetric)
+    adj = normalize_sparse(adj, symmetric=True)
     if isinstance(epsilon, float):
         epsilon = (epsilon,)
     else:
         assert len(epsilon) > 0
 
-    out = []
-
-    if symmetric:
-        if show_progress:
-
-            def solve(L: sp.spmatrix, x: tf.Tensor):
-                x, info = la.cg(L, x, x0=x0, tol=tol, maxiter=max_iter)
-                del info
-                return x
-
-        else:
-
-            def solve(L: LinearOperatorSparseMatrix, x: tf.Tensor):
-                iters, sol, *_ = tf.linalg.experimental.conjugate_gradient(
-                    L, x, tol=tol, max_iter=max_iter, x=x0
-                )
-                del iters
-                return sol
-
-    else:
-        raise NotImplementedError()
-
-    for eps in epsilon:
-        if eps == 1:
-            out.append(x)
-            continue
-        assert 0 < eps < 1, eps
-        L = tf.sparse.add(I, adj.with_values(adj.values * (eps - 1)))
-        if parallel_iterations is None:
-            parallel_iterations = x.shape[1]
-        else:
-            parallel_iterations = min(x.shape[1], parallel_iterations)
-
-        if show_progress:
-            L = scipy_utils.to_scipy(L)
-
-            def solve_all(x: tf.Tensor):
-                out = np.zeros(x.shape, dtype=x.dtype.as_numpy_dtype)
-                for i in tqdm.trange(x.shape[1], desc="Computing page-rank vectors"):
-                    out[:, i] = solve(L, x[:, i])  # pylint: disable=cell-var-from-loop
-                return tf.convert_to_tensor(out, x.dtype)
-
-        else:
-            L = LinearOperatorSparseMatrix(
-                L, is_self_adjoint=True, is_positive_definite=True
-            )
-
-            @tf.function
-            def solve_all(x: tf.Tensor):
-                # map only works on axis 0, hence the double transpose
-                solT = tf.map_fn(
-                    # lambda x: solve(L, x),
-                    functools.partial(solve, L),  # pylint: disable=cell-var-from-loop
-                    tf.transpose(x),
-                    parallel_iterations=parallel_iterations,
-                    fn_output_signature=tf.TensorSpec((num_nodes,), dtype=dtype),
-                )
-                return tf.transpose(solT)
-
-        with tf.device(device):
-            out.append(solve_all(x))
+    num_classes = tf.reduce_max(labels).numpy() + 1
+    out = [
+        _page_rank_labels_propagate(
+            adj, eps, x0, labels, num_classes, train_ids, tol, max_iter, show_progress
+        )
+        for eps in epsilon
+    ]
     if len(out) == 1:
         return out[0]
     return tf.concat(  # pylint: disable=unexpected-keyword-arg,no-value-for-parameter

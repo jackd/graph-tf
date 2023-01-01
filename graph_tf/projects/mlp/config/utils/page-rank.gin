@@ -1,3 +1,20 @@
+# import graph_tf.projects.mlp.data
+# data/gin.singleton.constructor = @gtf.mlp.data.page_rank_preprocess
+# gtf.mlp.data.page_rank_preprocess.data = %base_data
+# gtf.mlp.data.page_rank_preprocess.epsilon = %epsilon
+# gtf.mlp.data.page_rank_preprocess.tol = %tol
+# gtf.mlp.data.page_rank_preprocess.max_iter = %max_iter
+# gtf.mlp.data.page_rank_preprocess.show_progress = %show_progress
+# gtf.mlp.data.page_rank_preprocess.dropout_rate = %page_rank_dropout_rate
+# gtf.mlp.data.page_rank_preprocess.renormalized = %renormalized
+# page_rank_dropout_rate = 0
+# show_progress = False
+# renormalized = False
+
+# epsilon = 0.1
+# tol = 1e-3
+# max_iter = 100
+
 import graph_tf.data.transforms
 import graph_tf.projects.mlp.data
 
@@ -8,6 +25,15 @@ dual_features = [
 gtf.data.transforms.page_rank_propagate.epsilon = %epsilon
 gtf.data.transforms.page_rank_propagate.tol = %tol
 gtf.data.transforms.page_rank_propagate.max_iter = %max_iter
+gtf.data.transforms.page_rank_propagate.show_progress = %show_progress
+gtf.data.transforms.page_rank_propagate.renormalized = %renormalized
+gtf.data.transforms.page_rank_propagate.unscaled = %unscaled
+gtf.data.transforms.page_rank_propagate.rescale_factor = %rescale_factor
+
+renormalized = False
 epsilon = 0.1
 tol = 1e-3
 max_iter = 100
+show_progress = False
+unscaled = False
+rescale_factor = 1.0

@@ -10,12 +10,13 @@ balanced_split = False
 
 largest_component_only = True
 
-gtf.data.transforms.page_rank_propagate.tol = 1e-2
-gtf.data.transforms.page_rank_propagate.parallel_iterations = 128
 gtf.data.transforms.page_rank_propagate.show_progress = %show_progress
-show_progress = True
+gtf.data.transforms.page_rank_propagate.parallel_iterations = %parallel_iterations
 
-weight_decay = 1e-4
+parallel_iterations = 128
+show_progress = False
+
+l2_reg = 5e-5
 lr = 5e-3
 units = [32]
 epochs = 200
@@ -25,3 +26,4 @@ epsilon = 0.25
 include_transformed_features = False
 batch_size = 512
 dropout_rate = 0.1
+verbose = False

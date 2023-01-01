@@ -4,3 +4,9 @@ include "gtf_config/data/classification.gin"
 
 base_data = @gtf.data.get_data()
 gtf.data.get_data.name = %problem
+
+gtf.data.get_data.make_unweighted = %make_unweighted
+gtf.data.get_data.remove_self_loops = %remove_self_loops
+
+make_unweighted = False
+remove_self_loops = False

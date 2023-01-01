@@ -3,6 +3,7 @@ import typing as tp
 
 import numpy as np
 import scipy.sparse as sp
+import tensorflow as tf
 
 
 class TransitiveData(abc.ABC):
@@ -38,14 +39,14 @@ class TransitiveData(abc.ABC):
 
 
 class DataSplit(tp.NamedTuple):
-    train_data: tp.Iterable
-    validation_data: tp.Optional[tp.Iterable]
-    test_data: tp.Optional[tp.Iterable]
+    train_data: tf.data.Dataset
+    validation_data: tp.Optional[tf.data.Dataset]
+    test_data: tp.Optional[tf.data.Dataset]
 
 
 def data_split(
-    train_data: tp.Iterable,
-    validation_data: tp.Optional[tp.Iterable] = None,
-    test_data: tp.Optional[tp.Iterable] = None,
+    train_data: tf.data.Dataset,
+    validation_data: tp.Optional[tf.data.Dataset] = None,
+    test_data: tp.Optional[tf.data.Dataset] = None,
 ) -> DataSplit:
     return DataSplit(train_data, validation_data, test_data)

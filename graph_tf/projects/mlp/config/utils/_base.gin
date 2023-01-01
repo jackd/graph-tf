@@ -1,4 +1,5 @@
 import graph_tf.utils.models
+import graph_tf.utils.callbacks
 import graph_tf.projects.mlp.data
 import graph_tf.configurables
 
@@ -12,8 +13,10 @@ gtf.mlp.data.preprocess.data = %base_data
 gtf.mlp.data.preprocess.features_transform = %features_transform
 gtf.mlp.data.preprocess.adjacency_features = %adjacency_features
 gtf.mlp.data.preprocess.dual_features = %dual_features
+gtf.mlp.data.preprocess.label_features = %label_features
 gtf.mlp.data.preprocess.include_transformed_features = %include_transformed_features
 gtf.mlp.data.preprocess.largest_component_only = %largest_component_only
+gtf.mlp.data.preprocess.normalize_outputs = %normalize_outputs
 
 model_fn = @gtf.utils.models.mlp
 gtf.utils.models.mlp.hidden_units = %units
@@ -28,22 +31,27 @@ normalization = None
 gtf.utils.models.dense.kernel_regularizer = %kernel_regularizer
 
 kernel_regularizer = @tf.keras.regularizers.L2()
-tf.keras.regularizers.L2.l2 = %weight_decay
+tf.keras.regularizers.L2.l2 = %l2_reg
 
 optimizer = @tf.keras.optimizers.Adam()
 tf.keras.optimizers.Adam.learning_rate = %lr
 callbacks = [
-    @tf.keras.callbacks.EarlyStopping(),
-    @tf.keras.callbacks.TensorBoard(),
+    # @tf.keras.callbacks.EarlyStopping(),
+    # @tf.keras.callbacks.TensorBoard(),
+    @gtf.utils.callbacks.EarlyStoppingV2()
 ]
-callbacks = []  # HACK
-tf.keras.callbacks.TensorBoard.log_dir = '/tmp/gtf-logs/mlp'
+# tf.keras.callbacks.TensorBoard.log_dir = '/tmp/gtf-logs/mlp'
 # tf.keras.callbacks.TensorBoard.profile_batch = (10, 20)
 
-tf.keras.callbacks.EarlyStopping.restore_best_weights = True
-tf.keras.callbacks.EarlyStopping.monitor = %monitor
-tf.keras.callbacks.EarlyStopping.mode = %mode
-tf.keras.callbacks.EarlyStopping.patience = %patience
+gtf.utils.callbacks.EarlyStoppingV2.restore_best_weights = True
+gtf.utils.callbacks.EarlyStoppingV2.monitor = %monitor
+gtf.utils.callbacks.EarlyStoppingV2.mode = %mode
+gtf.utils.callbacks.EarlyStoppingV2.patience = %patience
+
+# tf.keras.callbacks.EarlyStopping.restore_best_weights = True
+# tf.keras.callbacks.EarlyStopping.monitor = %monitor
+# tf.keras.callbacks.EarlyStopping.mode = %mode
+# tf.keras.callbacks.EarlyStopping.patience = %patience
 
 features_transform = (
     @gtf.data.transforms.row_normalize,
@@ -57,15 +65,18 @@ batch_size = -1
 fmt = "dense"
 adjacency_features = ()
 dual_features = ()
+label_features = ()
 # monitor = 'val_acc'
 # mode = 'max'
 monitor = 'val_cross_entropy'
 mode = 'min'
 patience = 200
 epochs = 2000
-weight_decay = 5e-3
+l2_reg = 5e-4
 lr = 1e-2
 units = (128,)
 input_dropout_rate = None
 dropout_rate = 0.5
 largest_component_only = False
+renormalized = False
+normalize_outputs = False

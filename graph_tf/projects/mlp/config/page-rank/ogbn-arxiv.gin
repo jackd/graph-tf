@@ -1,0 +1,27 @@
+# based on DAGNN
+import graph_tf.utils.models
+
+include "mlp/config/ogbn-arxiv.gin"
+include "mlp/config/utils/page-rank.gin"
+
+include_transformed_features = False
+show_progress = False
+renormalized = True
+
+unscaled = True
+
+input_dropout_rate = 0
+dropout_rate = 0.2
+lr = 5e-3
+l2_reg = 0
+
+epochs = 1000
+patience = 1000
+units = (256,)
+gtf.utils.models.mlp.activation = 'relu'
+gtf.utils.models.mlp.normalization = @gtf.utils.models.batch_norm
+gtf.utils.models.batch_norm.momentum = 0.9
+epsilon = 0.0625
+
+monitor = 'val_acc'
+mode = 'max'

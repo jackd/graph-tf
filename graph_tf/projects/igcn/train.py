@@ -98,25 +98,33 @@ def build_fit_test(
     steps_per_epoch: tp.Optional[int] = None,
     verbose: bool = True,
     show_progress: bool = True,
+    parallel_iterations: tp.Optional[int] = None,
 ):
     print("Starting build_fit_test")
-    features = transforms.transformed(data.node_features, features_transform)
-
-    if isinstance(features, tf.SparseTensor):
-        features = SparseMatrix(features)
-
-    laplacian = data_lib.get_shifted_laplacian(data.adjacency, epsilon=epsilon)
-    print("Computing training data...")
-    train_prop = data_lib.sparse_cg_solver(
-        laplacian,
-        data.train_ids,
+    solver_kwargs = dict(
+        epsilon=epsilon,
         tol=tol,
         max_iter=max_iter,
-        preprocess=preprocess_train,
         show_progress=show_progress,
+        parallel_iterations=parallel_iterations,
+        rescaled=True,
     )
-    train_feats = train_prop @ features
+    with tf.device("/cpu:0"):
+        features = transforms.transformed(data.node_features, features_transform)
+        print("Computing training data...")
+        train_prop = data_lib.sparse_cg_solver(
+            data.adjacency, data.train_ids, preprocess=preprocess_train, **solver_kwargs
+        )
+        if preprocess_train:
+            tf.debugging.assert_all_finite(
+                train_prop, "train_prop values must be finite"
+            )
+        if isinstance(features, tf.SparseTensor):
+            features = SparseMatrix(features)
+        train_feats = train_prop @ features
+        tf.debugging.assert_all_finite(train_feats, "train_feats must all be finite")
     train_labels = tf.gather(data.labels, data.train_ids)
+
     print("Building model...")
     mlp = model_fn(tf.type_spec_from_value(train_feats))
     mlp.compile(
@@ -147,54 +155,48 @@ def build_fit_test(
         verbose=verbose,
     )
     print("Evaluating on test nodes...")
-    evaluator = SparseInputPropagatedEvaluator(mlp)
-    test_prop = data_lib.sparse_cg_solver(
-        laplacian,
-        data.test_ids,
-        tol=tol,
-        max_iter=max_iter,
-        preprocess=preprocess_test,
-        show_progress=show_progress,
-    )
-    test_labels = tf.gather(data.labels, data.test_ids)
+    with tf.device("/cpu:0"):
+        evaluator = SparseInputPropagatedEvaluator(mlp)
+        test_prop = data_lib.sparse_cg_solver(
+            data.adjacency, data.test_ids, preprocess=preprocess_test, **solver_kwargs
+        )
+        test_labels = tf.gather(data.labels, data.test_ids)
 
-    test_results = evaluator.eval(
-        features, test_prop, test_labels, batch_size=test_batch_size
-    )
+        test_results = evaluator.eval(
+            features, test_prop, test_labels, batch_size=test_batch_size
+        )
     return mlp, history, test_results
 
 
 if __name__ == "__main__":
-    import sys
+    import gacl
 
     from graph_tf.data.single import get_data, with_random_split_ids
+    from graph_tf.utils import experiment_callbacks as ecb
     from graph_tf.utils.models import dense, mlp
 
-    seed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+    num_trials = 10
 
-    tf.random.set_seed(seed)
-
-    # name = "cora"
-    # sparse_features = True
-    # num_classes = 7
-    # epochs = 100
-    # weight_decay = 5e-3
-    # feature_transforms = [
-    #     transforms.row_normalize,
-    #     functools.partial(transforms.to_format, fmt="sparse"),
-    # ]
-    # hidden_units = (128,)
-    # dropout_rate = 0.5
-    # epsilon = 0.1
+    # name = "bojchevski-cora-full"
+    # sparse_features = False
+    # num_classes = 70
+    # epochs = 200
+    # l2_reg = 5e-5
+    # feature_transforms = ()
+    # hidden_units = (32,)
+    # dropout_rate = 0.1
+    # epsilon = 0.25
     # train_batch_size = -1
     # test_batch_size = -1
-    # random_splits = False
+    # random_splits = True
+    # show_progress = False
+    # parallel_iterations = None
 
     name = "bojchevski-mag-coarse"
     sparse_features = True
-    num_classes = 8
+    num_classes = 80
     epochs = 200
-    weight_decay = 1e-4
+    l2_reg = 5e-5
     feature_transforms = ()
     hidden_units = (32,)
     dropout_rate = 0.1
@@ -202,22 +204,24 @@ if __name__ == "__main__":
     train_batch_size = -1
     test_batch_size = 512
     random_splits = True
+    parallel_iterations = None
+    show_progress = True
     # seed, result
-    # 0, {'acc': 0.7680304, 'cross_entropy': 1.1870477}
-    # 1, {'acc': 0.7457247, 'cross_entropy': 1.1971984}
-    # 2, {'acc': 0.76893574, 'cross_entropy': 1.0733341}
-    # 3, {'acc': 0.7546529, 'cross_entropy': 1.301297}
-    # 4, {'acc': 0.69451934, 'cross_entropy': 1.5927169}
-    # 5, {'acc': 0.7482539, 'cross_entropy': 1.3115343}
-    # 6, {'acc': 0.72400796, 'cross_entropy': 1.5631235}
-    # 7, {'acc': 0.7387255, 'cross_entropy': 1.2702699}
-    # 8, {'acc': 0.74978274, 'cross_entropy': 1.3156145}
-    # 9, {'acc': 0.7307407, 'cross_entropy': 1.4844735}
-    tol = 1e-3
+    ## 0, {'acc': 0.7680304, 'cross_entropy': 1.1870477}
+    ## 1, {'acc': 0.7457247, 'cross_entropy': 1.1971984}
+    ## 2, {'acc': 0.76893574, 'cross_entropy': 1.0733341}
+    ## 3, {'acc': 0.7546529, 'cross_entropy': 1.301297}
+    ## 4, {'acc': 0.69451934, 'cross_entropy': 1.5927169}
+    ## 5, {'acc': 0.7482539, 'cross_entropy': 1.3115343}
+    ## 6, {'acc': 0.72400796, 'cross_entropy': 1.5631235}
+    ## 7, {'acc': 0.7387255, 'cross_entropy': 1.2702699}
+    ## 8, {'acc': 0.74978274, 'cross_entropy': 1.3156145}
+    ## 9, {'acc': 0.7307407, 'cross_entropy': 1.4844735}
+    tol = 1e-2
     max_iter = 100
 
     dense_fn = functools.partial(
-        dense, kernel_regularizer=tf.keras.regularizers.L2(weight_decay)
+        dense, kernel_regularizer=tf.keras.regularizers.L2(l2_reg)
     )
     model_fn = functools.partial(
         mlp,
@@ -229,26 +233,40 @@ if __name__ == "__main__":
 
     with tf.device("/cpu:0"):
         data = get_data(name, sparse_features=sparse_features)
-    if random_splits:
-        data = with_random_split_ids(data, 20, 200, balanced=False, seed=0)
-    _, _, test_result = build_fit_test(
-        data,
-        epsilon=epsilon,
-        model_fn=model_fn,
-        features_transform=feature_transforms,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        optimizer=tf.keras.optimizers.Adam(1e-2),
-        metrics=[
-            tf.keras.metrics.SparseCategoricalAccuracy(name="acc"),
-            tf.keras.metrics.SparseCategoricalCrossentropy(
-                from_logits=True, name="cross_entropy"
-            ),
-        ],
-        epochs=epochs,
-        train_batch_size=train_batch_size,
-        test_batch_size=test_batch_size,
-        tol=tol,
-        max_iter=max_iter,
-    )
-    print(f"seed = {seed}")
-    print({k: v.numpy() for k, v in test_result.items()})
+
+    def _main():
+
+        if random_splits:
+            split_data = with_random_split_ids(data, 20, 200, balanced=False, seed=seed)
+        else:
+            split_data = data
+        return build_fit_test(
+            split_data,
+            epsilon=epsilon,
+            model_fn=model_fn,
+            features_transform=feature_transforms,
+            loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            optimizer=tf.keras.optimizers.Adam(1e-2),
+            metrics=[
+                tf.keras.metrics.SparseCategoricalAccuracy(name="acc"),
+                tf.keras.metrics.SparseCategoricalCrossentropy(
+                    from_logits=True, name="cross_entropy"
+                ),
+            ],
+            epochs=epochs,
+            train_batch_size=train_batch_size,
+            test_batch_size=test_batch_size,
+            tol=tol,
+            max_iter=max_iter,
+            parallel_iterations=parallel_iterations,
+            show_progress=show_progress,
+        )
+
+    seed = 0
+    callbacks = [
+        ecb.TensorflowRngSetter(seed),
+        ecb.TensorflowSeedSetter(seed),
+        ecb.NumpySeedSetter(seed),
+        ecb.FitReporter(),
+    ]
+    gacl.main(_main, callbacks, num_trials=num_trials)

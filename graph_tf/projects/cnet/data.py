@@ -2,9 +2,9 @@ import functools
 import typing as tp
 
 import gin
+import stfu
 import tensorflow as tf
 
-import stfu
 from graph_tf.data.single import (
     DataSplit,
     SemiSupervisedSingle,
@@ -21,7 +21,7 @@ def preprocess_single(
     data: SemiSupervisedSingle,
     batch_size: int,
     features_transform=(),
-    transition_transform=(),
+    # transition_transform=(),
     jl_factor: float = 4.0,
     z_seed: int = 0,
     dataset_seed: int = 0,

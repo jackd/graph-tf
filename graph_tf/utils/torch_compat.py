@@ -1,4 +1,5 @@
 import functools
+import typing as tp
 from typing import Callable, List, Tuple
 
 import gin
@@ -28,6 +29,14 @@ def with_weight_decay(
     if weight_decay:
         return [(g + weight_decay * v, v) for g, v in grads_and_vars]
     return grads_and_vars
+
+
+@register
+def with_transform(
+    grads_and_vars: GradsAndVars,
+    transform: tp.Callable[[tf.Tensor, tf.Variable], tf.Tensor],
+) -> GradsAndVars:
+    return [(transform(g, v), v) for g, v in grads_and_vars]
 
 
 @register

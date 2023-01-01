@@ -1,0 +1,11 @@
+include 'gtf_config/data/dgl/computer.gin'
+include 'dagnn/config/_base.gin'
+include 'dagnn/config/utils/random_splits.gin'
+
+largest_component_only = True
+l2_reg = 2.5e-5
+dropout_rate = 0.5
+num_propagations = 5
+
+epochs = 3000
+patience = 300

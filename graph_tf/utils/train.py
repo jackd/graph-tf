@@ -1,5 +1,5 @@
 import sys
-from typing import Iterable, Optional
+import typing as tp
 
 import numpy as np
 import tensorflow as tf
@@ -93,7 +93,7 @@ def fit_single(
     epochs: int = 1,
     initial_epoch: int = 0,
     validation_freq: int = 1,
-    callbacks: Iterable[tf.keras.callbacks.Callback] = (),
+    callbacks: tp.Iterable[tf.keras.callbacks.Callback] = (),
     verbose: bool = True,
     jit_compile: bool = False,
 ):
@@ -109,7 +109,7 @@ def fit_single(
         epochs: int, maximum number of epochs / steps to train for.
         initial_epoch: int, starting epoch.
         validation_freq: int, number of training steps/epochs per validation.
-        callbacks: Iterable of tf.keras.callbacks.Callbacks.
+        callbacks: tp.Iterable of tf.keras.callbacks.Callbacks.
         verbose: flag resulting in verbose outputs.
         jit_compile: flag indicating whether train/validation steps are compiled
             with `jit`. Not all ops are jit compatible, though where they are this may
@@ -169,14 +169,73 @@ def fit_single(
             break
         # validation
         if validation_step is not None and (epoch + 1) % validation_freq == 0:
+            cb.on_test_begin(logs=None)
+            cb.on_test_batch_begin(0, logs=None)
             val_logs = validation_step()
+            cb.on_test_batch_end(0, logs=val_logs)
+            cb.on_test_end(logs=val_logs)
             logs.update({f"val_{k}": v for k, v in val_logs.items()})
         cb.on_epoch_end(epoch, logs)
         if model.stop_training:
             break
-
     cb.on_train_end(logs)
     return model.history
+
+
+def print_result_stats(results: tp.Union[tp.Mapping, tp.Sequence[tp.Mapping]]):
+    if hasattr(results, "items"):
+        merged = results
+    else:
+        merged = {}
+        for r in results:
+            for k, v in r.items():
+                merged.setdefault(k, []).append(v)
+
+    print_results(
+        {
+            k: f"{np.mean(v)} +- {np.std(v)}"
+            for k, v in merged.items()
+            if not isinstance(v, str)
+        }
+    )
+
+
+def print_results(
+    results: tp.Mapping[str, tp.Any], print_fn: tp.Callable[[str], None] = print
+):
+    if not results:
+        return
+    width = max(len(k) for k in results) + 1
+    for k in sorted(results):
+        print_fn(f"{k.ljust(width)}: {results[k]}")
+
+
+def finalize(
+    model: tf.keras.Model,
+    validation_data: tp.Optional[tf.data.Dataset] = None,
+    test_data: tp.Optional[tf.data.Dataset] = None,
+    callbacks: tp.Iterable[tf.keras.callbacks.Callback] = (),
+) -> tp.Dict[str, float]:
+    results = {}
+
+    def evaluate(data):
+        if isinstance(data, tf.data.Dataset):
+            verbose = len(data) > 1
+        else:
+            verbose = False
+            data = tf.data.Dataset.from_tensors(unpack(data))
+        return model.evaluate(
+            data, return_dict=True, verbose=verbose, callbacks=callbacks
+        )
+
+    if validation_data is not None:
+        val_res = evaluate(validation_data)
+        results.update({f"val_{k}": v for k, v in val_res.items()})
+    if test_data is not None:
+        test_res = evaluate(test_data)
+        results.update({f"test_{k}": v for k, v in test_res.items()})
+
+    return results
 
 
 def fit(
@@ -186,10 +245,11 @@ def fit(
     epochs: int = 1,
     initial_epoch: int = 0,
     validation_freq: int = 1,
-    callbacks: Iterable[tf.keras.callbacks.Callback] = (),
-    steps_per_epoch: Optional[int] = None,
+    callbacks: tp.Iterable[tf.keras.callbacks.Callback] = (),
+    steps_per_epoch: tp.Optional[int] = None,
     verbose: bool = True,
     jit_compile: bool = False,
+    force_normal: bool = False,
 ):
     """
     Call `fit_single` or `Model.fit` based on `train_data`.
@@ -205,7 +265,7 @@ def fit(
         epochs: int, maximum number of steps/epochs to train for.
         initial_epoch: int, starting epoch.
         validation_freq: int, number of training steps/epochs per validation.
-        callbacks: Iterable of `tf.keras.callbacks.Callbacks`.
+        callbacks: tp.Iterable of `tf.keras.callbacks.Callbacks`.
         steps_per_epoch: Number of steps per epoch. Must be 1 if specified and
             train_data is a not a `tf.data.Dataset`.
         verbose: flag resulting in verbose outputs.
@@ -218,7 +278,7 @@ def fit(
     def is_single(data):
         return not isinstance(data, tf.data.Dataset) or data.cardinality() == 1
 
-    if is_single(train_data) and is_single(validation_data):
+    if not force_normal and is_single(train_data) and is_single(validation_data):
         assert steps_per_epoch is None or steps_per_epoch == 1
         return fit_single(
             model=model,

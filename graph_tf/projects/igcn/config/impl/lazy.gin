@@ -1,2 +1,1 @@
-train_propagator_fn = @gtf.igcn.data.sparse_cg_solver
-validation_propagator_fn = @gtf.igcn.data.sparse_cg_solver
+preprocess = False

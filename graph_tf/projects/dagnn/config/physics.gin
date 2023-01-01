@@ -1,0 +1,9 @@
+include 'gtf_config/data/dgl/physics.gin'
+include 'dagnn/config/_base.gin'
+include 'dagnn/config/utils/random_splits.gin'
+
+gtf.data.transforms.to_format.fmt = "sparse"
+
+l2_reg = 0
+dropout_rate = 0.8
+num_propagations = 5

@@ -7,6 +7,8 @@ gacl.main.fun = @kt.search
 gacl.main.callbacks = %experiment_callbacks
 
 experiment_callbacks = [
+    # @gtf.utils.experiment_callbacks.TensorflowDeterministicConfigurer(),
+    @gtf.utils.experiment_callbacks.TensorflowRngSetter(),
     @gtf.utils.experiment_callbacks.TensorflowSeedSetter(),
     @gtf.utils.experiment_callbacks.NumpySeedSetter(),
     @gacl.callbacks.GinConfigLogger(),

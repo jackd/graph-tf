@@ -1,0 +1,10 @@
+import graph_tf.projects.igcn.models
+
+model_fn = @gtf.igcn.models.logit_propagated_model_v2
+
+gtf.igcn.models.logit_propagated_model_v2.num_classes = %num_classes
+gtf.igcn.models.logit_propagated_model_v2.hidden_units = %hidden_units
+gtf.igcn.models.logit_propagated_model_v2.dropout_rate = %dropout_rate
+gtf.igcn.models.logit_propagated_model_v2.dense_fn = @gtf.utils.models.dense
+gtf.igcn.models.logit_propagated_model_v2.activation = %activation
+# gtf.igcn.models.logit_propagated_model_v2.input_dropout_rate = %input_dropout_rate

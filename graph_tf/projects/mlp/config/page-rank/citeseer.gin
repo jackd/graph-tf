@@ -1,0 +1,10 @@
+include "mlp/config/citeseer.gin"
+include "mlp/config/utils/page-rank.gin"
+
+include_transformed_features = False
+show_progress = False
+renormalized = True
+unscaled = True
+units = (64,)
+l2_reg = 1e-2
+dropout_rate = 0.5

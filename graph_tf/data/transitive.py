@@ -120,9 +120,10 @@ class Papers100MData(TransitiveData):
         col = adj["col"][:]
         if self.symmetric:
             print("  Making symmetric...")
-            valid = row < col
+            valid = row != col
             row = row[valid]
             col = col[valid]
+
             row, col = np.concatenate((row, col)), np.concatenate((col, row))
             i1d: np.ndarray = np.ravel_multi_index((row, col), (n, n))
             i1d.sort()  # pylint: disable=no-member

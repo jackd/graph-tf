@@ -127,7 +127,7 @@ def get_spectral_split(
 
     def get_examples(labels, weights) -> tp.Iterable:
         example = v, labels, weights
-        return (example,)
+        return tf.data.Dataset.from_tensors(example)
 
     return DataSplit(
         get_examples(data.train_labels, data.train_weights),

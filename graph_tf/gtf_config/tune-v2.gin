@@ -1,0 +1,19 @@
+import gacl
+import graph_tf.mains.tune
+include "gtf_config/build_and_fit_many.gin"
+
+gacl.main.fun = @gtf.tune.fit
+gacl.main.num_trials = 1 # outer
+gacl.main.callbacks = @gtf.tune.OuterTuneReporter()
+
+gtf.tune.OuterTuneReporter.metric = %tune_metric
+gtf.tune.OuterTuneReporter.mode = %tune_mode
+gtf.tune.OuterTuneReporter.scope = %tune_scope
+
+gtf.tune.objective.fun = @gtf.build_and_fit
+gtf.tune.objective.callbacks = @gtf.tune.with_inner_tune_reporter()
+gtf.tune.objective.num_trials = %num_trials
+
+gtf.tune.with_inner_tune_reporter.callbacks = %experiment_callbacks
+
+gtf.tune.fit.param_space = %param_space

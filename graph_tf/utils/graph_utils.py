@@ -2,16 +2,19 @@ import inspect
 import typing as tp
 
 import scipy.sparse as sp
+import stfu
 import tensorflow as tf
 
-import stfu
 from graph_tf.utils.linalg import SparseLinearOperator, SubtractProjection
 from graph_tf.utils.random_utils import as_rng
 from graph_tf.utils.scipy_utils import to_scipy
 
 
 def get_largest_component_indices(
-    adjacency: tf.SparseTensor, *, directed: bool = True, connection="weak",
+    adjacency: tf.SparseTensor,
+    *,
+    directed: bool = True,
+    connection="weak",
 ) -> tf.Tensor:
     """
     Get the indices associated with the largest connected component.
@@ -128,7 +131,10 @@ def signed_incidence(adj: tf.SparseTensor) -> tf.SparseTensor:
     neg_indices = tf.stack((edge_indices, j), axis=1)
     # pylint: disable=unexpected-keyword-arg,no-value-for-parameter
     indices = tf.concat((pos_indices, neg_indices), axis=0)
-    values = tf.concat((v, -v), axis=0,)
+    values = tf.concat(
+        (v, -v),
+        axis=0,
+    )
     # pylint: enable=unexpected-keyword-arg,no-value-for-parameter
     incidence = tf.SparseTensor(indices, values, (num_edges, num_nodes))
     incidence = tf.sparse.reorder(incidence)  # pylint: disable=no-value-for-parameter

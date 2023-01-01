@@ -3,5 +3,7 @@ validation_propagator_fn = @gtf.igcn.data.low_rank_inverse_approx
 test_propagator_fn = @gtf.igcn.data.low_rank_inverse_approx
 
 gtf.igcn.data.low_rank_inverse_approx.k = %rank
+gtf.igcn.data.low_rank_inverse_approx.epsilon = %epsilon
+gtf.igcn.data.low_rank_inverse_approx.rescaled = %rescaled
 
 rank = 100

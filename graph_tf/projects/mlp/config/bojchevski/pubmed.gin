@@ -2,6 +2,3 @@ import graph_tf.data.single
 
 include "gtf_config/data/bojchevski/pubmed.gin"
 include "mlp/config/bojchevski/_base.gin"
-
-show_progress = False  # faster
-batch_size = -1  # There is only 1 training batch

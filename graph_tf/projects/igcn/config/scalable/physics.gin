@@ -3,7 +3,7 @@ import graph_tf.configurables.core
 problem = "physics"
 num_classes = 7
 epsilon = 0.1
-weight_decay = 0
+l2_reg = 0
 dropout_rate = 0.8
 hidden_units = (64,)
 

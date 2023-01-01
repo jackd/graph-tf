@@ -1,0 +1,13 @@
+import graph_tf.data.transforms
+dual_features = [
+    @gtf.data.transforms.heat_propagate,
+]
+gtf.data.transforms.heat_propagate.t = %t
+gtf.data.transforms.heat_propagate.show_progress = %show_progress
+gtf.data.transforms.heat_propagate.symmetric = %symmetric
+gtf.data.transforms.heat_propagate.renormalized = %renormalized
+
+t = 1.0
+show_progress = True
+symmetric = True
+renormalized = False

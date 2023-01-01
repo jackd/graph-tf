@@ -1,0 +1,4 @@
+include "mlp/config/citeseer.gin"
+include "mlp/config/page-rank/ssgc-bugged/_base.gin"
+
+l2_reg = 5e-5

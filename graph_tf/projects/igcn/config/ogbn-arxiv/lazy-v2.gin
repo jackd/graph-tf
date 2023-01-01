@@ -1,0 +1,16 @@
+include "igcn/config/ogbn-arxiv/lazy.gin"
+
+# same as DAGNN
+lr = 5e-3
+gtf.utils.models.mlp.normalization = @gtf.utils.models.batch_norm
+gtf.utils.models.batch_norm.momentum = 0.9
+dropout_rate = 0.2
+input_dropout_rate = 0
+units = (256,)
+epochs = 1000
+patience = 1000
+monitor = "val_acc"
+mode = "max"
+epsilon = 0.0625  # 1 / 16
+rescaled = True
+renormalized = True

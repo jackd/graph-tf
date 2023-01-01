@@ -21,17 +21,22 @@ cache_path = @gtf.utils.os_utils.expand()
 cache_path/gtf.utils.os_utils.expand.path = '$GTF_DATA_DIR/page-rank/ogbn-papers100m.h5'
 
 epsilon = (0.1, 1.0)
-max_iter = 100
-tol = 1e-3
+max_iter = 1000
+tol = 1e-2
 batch_size = 256
 in_memory = True
 
+lr = 5e-5
+reduction = 'sum_over_batch_size'
 units = (512, 512, 512)
 input_dropout_rate = 0
 dropout_rate = 0.3
 
-epochs = 45
+epochs = 100
 patience = 10
 normalization = @gtf.utils.models.batch_norm
 gtf.utils.models.batch_norm.momentum = 0.9
-weight_decay = 0
+l2_reg = 0
+
+# monitor = 'val_acc'
+# mode = 'max'

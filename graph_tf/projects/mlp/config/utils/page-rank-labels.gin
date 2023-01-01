@@ -1,0 +1,14 @@
+import graph_tf.data.transforms
+
+label_features = [
+    @gtf.data.transforms.page_rank_labels_propagate
+]
+
+gtf.data.transforms.page_rank_labels_propagate.epsilon = %epsilon
+gtf.data.transforms.page_rank_labels_propagate.tol = %tol
+gtf.data.transforms.page_rank_labels_propagate.max_iter = %max_iter
+gtf.data.transforms.page_rank_labels_propagate.show_progress = %show_progress
+epsilon = 0.1
+tol = 1e-3
+max_iter = 100
+show_progress = True

@@ -1,0 +1,12 @@
+include "mlp/config/physics.gin"
+include "mlp/config/utils/page-rank.gin"
+
+include_transformed_features = False
+show_progress = False
+renormalized = True
+unscaled = True
+units = (64,)
+
+l2_reg = 0
+epsilon = 0.2
+dropout_rate = 0.8

@@ -67,7 +67,7 @@ def Float(
     default: tp.Optional[float] = None,
     parent_name: tp.Optional[str] = None,
     parent_values=None,
-):
+) -> float:
     return hp.Float(
         name=name,
         min_value=min_value,
@@ -91,7 +91,7 @@ def Int(
     default: tp.Optional[str] = None,
     parent_name: tp.Optional[str] = None,
     parent_values=None,
-):
+) -> int:
     return hp.Int(
         name=name,
         min_value=min_value,

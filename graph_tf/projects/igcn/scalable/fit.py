@@ -8,11 +8,10 @@ import scipy.sparse as sp
 import tensorflow as tf
 
 from graph_tf.data.single import SemiSupervisedSingle
-from graph_tf.mains.build_and_fit import print_results
 from graph_tf.projects.igcn.scalable import eval as eval_lib
 from graph_tf.projects.igcn.scalable import train as train_lib
 from graph_tf.projects.igcn.scalable.data_types import Features, FeaturesTransform
-from graph_tf.utils.train import EpochProgbarLogger
+from graph_tf.utils.train import EpochProgbarLogger, print_results
 
 register = functools.partial(gin.register, module="gtf.igcn.scalable")
 
@@ -280,7 +279,7 @@ if __name__ == "__main__":
     from graph_tf.data.single import get_data
     from graph_tf.utils.models import mlp, prelu
 
-    # from graph_tf.utils.torch_compat import weight_decay_transformer
+    # from graph_tf.utils.torch_compat import l2_reg_transformer
 
     tf.random.set_seed(0)
     np.random.seed(0)
@@ -415,7 +414,7 @@ if __name__ == "__main__":
     eval_manager = eval_lib.EagerEvaluatorManager(eval_dir, epsilon=epsilon)
     optimizer = tf.keras.optimizers.Adam(
         lr,
-        # gradient_transformers=[weight_decay_transformer(5e-3)],
+        # gradient_transformers=[l2_reg_transformer(5e-3)],
     )
 
     build_fit_test(

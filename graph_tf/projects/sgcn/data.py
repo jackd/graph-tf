@@ -53,7 +53,7 @@ def preprocess_single(
     def get_split(ids: tf.Tensor):
         weights = preprocess_weights(ids, num_nodes, normalize=True)
         example = (inputs, data.labels, weights)
-        return (example,)
+        return tf.data.Dataset.from_tensors(example)
 
     return DataSplit(
         get_split(data.train_ids),

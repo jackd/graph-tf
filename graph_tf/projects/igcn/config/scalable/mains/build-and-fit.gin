@@ -24,15 +24,14 @@ mlp_fn = @gtf.utils.models.mlp
 gtf.utils.models.mlp.output_units = %num_classes
 gtf.utils.models.mlp.hidden_units = %hidden_units
 gtf.utils.models.mlp.dropout_rate = %dropout_rate
+gtf.utils.models.mlp.dense_fn = @gtf.utils.models.dense
+
+gtf.utils.models.dense.kernel_regularizer = @tf.keras.regularizers.L2()
+tf.keras.regularizers.L2.l2 = %l2_reg
 
 optimizer = @tf.keras.optimizers.Adam()
 tf.keras.optimizers.Adam.learning_rate = %lr
-tf.keras.optimizers.Adam.gradient_transformers = %gradient_transformers
-gradient_transformers = [
-    @gtf.utils.weight_decay_transformer()
-]
 
-gtf.utils.weight_decay_transformer.weight_decay = %weight_decay
 callbacks = [@tf.keras.callbacks.EarlyStopping()]
 
 tf.keras.callbacks.EarlyStopping.restore_best_weights = True

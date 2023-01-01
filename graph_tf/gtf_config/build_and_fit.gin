@@ -3,6 +3,7 @@ import graph_tf.utils.experiment_callbacks
 
 gacl.main.fun = @gtf.build_and_fit
 gacl.main.callbacks = %experiment_callbacks
+gacl.main.num_trials = %num_trials
 
 gtf.build_and_fit.data = %data
 gtf.build_and_fit.model_fn = %model_fn
@@ -16,12 +17,20 @@ gtf.build_and_fit.epochs = %epochs
 gtf.build_and_fit.validation_freq = %validation_freq
 gtf.build_and_fit.initial_epoch = %initial_epoch
 gtf.build_and_fit.verbose = %verbose
+gtf.build_and_fit.force_normal = %force_normal
+gtf.build_and_fit.skip_validation = %skip_validation
+gtf.build_and_fit.skip_test = %skip_test
 
 experiment_callbacks = [
+    @gtf.utils.experiment_callbacks.TensorflowRngSetter(),
     @gtf.utils.experiment_callbacks.TensorflowSeedSetter(),
+    @gtf.utils.experiment_callbacks.NumpySeedSetter(),
+    @gtf.utils.experiment_callbacks.FitReporter(),
     @gacl.callbacks.GinConfigLogger(),
 ]
+gtf.utils.experiment_callbacks.TensorflowRngSetter.seed = %seed
 gtf.utils.experiment_callbacks.TensorflowSeedSetter.seed = %seed
+gtf.utils.experiment_callbacks.NumpySeedSetter.seed = %seed
 
 seed = 0
 metrics = None
@@ -32,6 +41,10 @@ validation_freq = 1
 initial_epoch = 0
 verbose = True
 steps_per_epoch = None
+force_normal = False
+skip_validation = False
+skip_test = False
+num_trials = 1
 
 # Requires:
 # data

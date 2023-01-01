@@ -1,0 +1,14 @@
+include "mlp/config/utils/page-rank.gin"
+include_transformed_features = False
+
+epsilon = 0.05
+renormalized = True
+unscaled = False
+units = ()
+input_dropout_rate = 0
+dropout_rate = 0
+epochs = 100
+lr = 0.2
+monitor = 'val_acc'
+mode = 'max'
+rescale_factor = 1.3125  # (1 + alpha) / (alpha * degree)

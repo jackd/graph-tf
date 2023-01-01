@@ -1,6 +1,7 @@
 include "igcn/config/impl/lp.gin"
 include "igcn/config/cora/_base.gin"
 
-weight_decay = 5e-3
+l2_reg = 2.5e-3
 epsilon = 0.1
 dropout_rate = 0.8
+renormalized = True

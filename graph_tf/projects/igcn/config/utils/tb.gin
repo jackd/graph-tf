@@ -1,11 +1,18 @@
 import graph_tf.configurables
 
 callbacks = [
-    @tf.keras.callbacks.EarlyStopping(),
     @tf.keras.callbacks.TensorBoard(),
 ]
 tf.keras.callbacks.TensorBoard.log_dir = %log_dir
 tf.keras.callbacks.TensorBoard.profile_batch = %profile_batch
 
-profile_batch = (10, 20)
+profile_batch = (10, 110)
+
 log_dir = "/tmp/graph_tf/igcn/"
+
+skip_validation = True
+skip_test = True
+force_normal = True
+verbose = False
+epochs = 111
+repeats = 1

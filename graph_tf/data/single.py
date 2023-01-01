@@ -15,7 +15,7 @@ from graph_tf.data.data_types import DataSplit
 from graph_tf.data.transforms import transformed
 from graph_tf.utils import scipy_utils
 from graph_tf.utils.graph_utils import get_largest_component_indices
-from graph_tf.utils.ops import indices_to_mask, unique_ravelled
+from graph_tf.utils.ops import indices_to_mask
 from graph_tf.utils.os_utils import get_dir
 
 register = functools.partial(gin.register, module="gtf.data")
@@ -150,18 +150,19 @@ def preprocess_base(
     adjacency_transform: tp.Union[
         SparseTensorTransform, tp.Iterable[SparseTensorTransform]
     ] = (),
+    device: str = "/cpu:0",
 ) -> SemiSupervisedSingle:
     if largest_component_only:
         data = get_largest_component(data)
-
-    return SemiSupervisedSingle(
-        transformed(data.node_features, features_transform),
-        transformed(data.adjacency, adjacency_transform),
-        data.labels,
-        data.train_ids,
-        data.validation_ids,
-        data.test_ids,
-    )
+    with tf.device(device):
+        return SemiSupervisedSingle(
+            transformed(data.node_features, features_transform),
+            transformed(data.adjacency, adjacency_transform),
+            data.labels,
+            data.train_ids,
+            data.validation_ids,
+            data.test_ids,
+        )
 
 
 @register
@@ -252,12 +253,14 @@ def with_random_split_ids(
 def to_classification_split(data: SemiSupervisedSingle) -> DataSplit:
     num_nodes = tf.shape(data.node_features, out_type=tf.int64)[0]
 
-    def get_data(indices):
+    def get_data(indices) -> tp.Optional[tf.data.Dataset]:
+        if indices is None:
+            return None
         weights = preprocess_weights(indices, num_nodes)
         labels = data.labels
         labels = tf.where(weights > 0, labels, tf.zeros_like(labels))
         example = ((data.node_features, data.adjacency), labels, weights)
-        return (example,)
+        return tf.data.Dataset.from_tensors(example)
 
     return DataSplit(
         *(get_data(ids) for ids in (data.train_ids, data.validation_ids, data.test_ids))
@@ -275,12 +278,11 @@ def to_autoencoder_split(data: AutoencoderData) -> DataSplit:
             return None
         assert labels is not None
         example = inputs, labels, weights
-        return (example,)
+        return tf.data.Dataset.from_tensors(example)
 
-    train_data = get_examples(data.train_labels, data.train_weights)
-    assert train_data is not None
+    assert data.train_weights is not None
     return DataSplit(
-        train_data,
+        get_examples(data.train_labels, data.train_weights),
         get_examples(data.true_labels, data.validation_weights),
         get_examples(data.true_labels, data.test_weights),
     )
@@ -590,7 +592,10 @@ def _load_dgl_example(
 def bojchevski_data(
     name: str,
     data_dir: tp.Optional[str] = None,
+    *,
     make_symmetric: bool = True,
+    make_unweighted: bool = False,
+    remove_self_loops: bool = False,
     sparse_features: bool = False,
     device: str = "/cpu:0",
 ) -> SemiSupervisedSingle:
@@ -600,14 +605,19 @@ def bojchevski_data(
             data_dir=data_dir,
             make_symmetric=make_symmetric,
             sparse_features=sparse_features,
+            make_unweighted=make_unweighted,
+            remove_self_loops=remove_self_loops,
         )
 
 
 def _bojchevski_data(
     name: str,
     data_dir: tp.Optional[str] = None,
+    *,
     make_symmetric: bool = True,
     sparse_features: bool = False,
+    make_unweighted: bool = False,
+    remove_self_loops: bool = False,
 ) -> SemiSupervisedSingle:
     if name.startswith("bojchevski-"):
         name = name[len("bojchevski-") :]
@@ -658,6 +668,7 @@ def _bojchevski_data(
             return csr_to_tf(data, indices, indptr, shape, make_symmetric)
 
         adj = load_sparse("adj_matrix", make_symmetric=make_symmetric)
+
         features = load_sparse("attr_matrix", make_symmetric=False)
         if not sparse_features and isinstance(features, tf.SparseTensor):
             features = tf.sparse.to_dense(features)
@@ -674,6 +685,16 @@ def _bojchevski_data(
         )
     else:
         raise NotImplementedError(name)
+    if make_unweighted:
+        adj = adj.with_values(tf.ones_like(adj.values))
+    if remove_self_loops:
+        i, j = tf.unstack(adj.indices, axis=1)
+        mask = i != j
+        adj = tf.SparseTensor(
+            tf.boolean_mask(adj.indices, mask),
+            tf.boolean_mask(adj.values, mask),
+            adj.dense_shape,
+        )
     labels = tf.convert_to_tensor(data_dict["labels"], dtype=tf.int64)
     return SemiSupervisedSingle(features, adj, labels, None, None, None)
 
@@ -749,115 +770,115 @@ def pos_neg_to_edges(pos_indices, neg_indices, mean_weights=False):
     return EdgeData(indices, labels, weights)
 
 
-@register
-def asymproj_data_v2(
-    name: str = "ca-AstroPh",
-    features_fn: tp.Optional[tp.Callable[[int], tf.Tensor]] = None,
-    adjacency_transform: tp.Union[
-        SparseTensorTransform, tp.Iterable[SparseTensorTransform]
-    ] = (),
-) -> AutoencoderDataV2:
-    # pylint: disable=import-outside-toplevel
-    import graph_tfds.graphs  # pylint: disable=unused-import
-    import tensorflow_datasets as tfds
+# @register
+# def asymproj_data_v2(
+#     name: str = "ca-AstroPh",
+#     features_fn: tp.Optional[tp.Callable[[int], tf.Tensor]] = None,
+#     adjacency_transform: tp.Union[
+#         SparseTensorTransform, tp.Iterable[SparseTensorTransform]
+#     ] = (),
+# ) -> AutoencoderDataV2:
+#     # pylint: disable=import-outside-toplevel
+#     import graph_tfds.graphs  # pylint: disable=unused-import
+#     import tensorflow_datasets as tfds
 
-    # pylint: enable=import-outside-toplevel
+#     # pylint: enable=import-outside-toplevel
 
-    example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
-    train_pos = example["train_pos"]
-    train_neg = example["train_neg"]
-    test_pos = example["test_pos"]
-    test_neg = example["test_neg"]
-    n = example["num_nodes"]
+#     example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
+#     train_pos = example["train_pos"]
+#     train_neg = example["train_neg"]
+#     test_pos = example["test_pos"]
+#     test_neg = example["test_neg"]
+#     n = example["num_nodes"]
 
-    train_edges = pos_neg_to_edges(train_pos, train_neg, mean_weights=False)
-    test_edges = pos_neg_to_edges(test_pos, test_neg, mean_weights=False)
-    validation_edges = None
+#     train_edges = pos_neg_to_edges(train_pos, train_neg, mean_weights=False)
+#     test_edges = pos_neg_to_edges(test_pos, test_neg, mean_weights=False)
+#     validation_edges = None
 
-    adjacency = tf.SparseTensor(train_pos, tf.ones((train_pos.shape[0],)), (n, n))
-    if features_fn is None:
-        features = None
-    else:
-        features = features_fn(n)
-    adjacency = transformed(adjacency, adjacency_transform)
-    return AutoencoderDataV2(
-        features, adjacency, train_edges, validation_edges, test_edges
-    )
+#     adjacency = tf.SparseTensor(train_pos, tf.ones((train_pos.shape[0],)), (n, n))
+#     if features_fn is None:
+#         features = None
+#     else:
+#         features = features_fn(n)
+#     adjacency = transformed(adjacency, adjacency_transform)
+#     return AutoencoderDataV2(
+#         features, adjacency, train_edges, validation_edges, test_edges
+#     )
 
 
-@register
-def asymproj_data(
-    name: str = "ca-AstroPh",
-    symmetric: bool = True,
-    use_all_train_edges: bool = False,
-    remove_train_self_edges: bool = False,
-    features_fn: tp.Optional[tp.Callable[[int], tf.Tensor]] = None,
-    adjacency_transform: tp.Union[
-        SparseTensorTransform, tp.Iterable[SparseTensorTransform]
-    ] = (),
-) -> AutoencoderData:
-    # pylint: disable=import-outside-toplevel
-    import graph_tfds.graphs  # pylint: disable=unused-import
-    import tensorflow_datasets as tfds
+# @register
+# def asymproj_data(
+#     name: str = "ca-AstroPh",
+#     symmetric: bool = True,
+#     use_all_train_edges: bool = False,
+#     remove_train_self_edges: bool = False,
+#     features_fn: tp.Optional[tp.Callable[[int], tf.Tensor]] = None,
+#     adjacency_transform: tp.Union[
+#         SparseTensorTransform, tp.Iterable[SparseTensorTransform]
+#     ] = (),
+# ) -> AutoencoderData:
+#     # pylint: disable=import-outside-toplevel
+#     import graph_tfds.graphs  # pylint: disable=unused-import
+#     import tensorflow_datasets as tfds
 
-    # pylint: enable=import-outside-toplevel
+#     # pylint: enable=import-outside-toplevel
 
-    example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
-    train_pos = example["train_pos"]
-    train_neg = example["train_neg"]
-    test_pos = example["test_pos"]
-    test_neg = example["test_neg"]
-    n = example["num_nodes"]
+#     example = tfds.load(f"asymproj/{name}", split="full").get_single_element()
+#     train_pos = example["train_pos"]
+#     train_neg = example["train_neg"]
+#     test_pos = example["test_pos"]
+#     test_neg = example["test_neg"]
+#     n = example["num_nodes"]
 
-    def to_symmetric(indices):
-        indices.shape.assert_has_rank(2)
-        assert indices.shape[1] == 2
-        row, col = tf.unstack(indices, axis=1)
-        row, col = tf.concat((row, col), 0), tf.concat((col, row), 0)
-        indices = tf.stack((row, col), axis=1)
-        indices, _ = unique_ravelled(indices, (n, n), axis=1)
-        return indices
+#     def to_symmetric(indices):
+#         indices.shape.assert_has_rank(2)
+#         assert indices.shape[1] == 2
+#         row, col = tf.unstack(indices, axis=1)
+#         row, col = tf.concat((row, col), 0), tf.concat((col, row), 0)
+#         indices = tf.stack((row, col), axis=1)
+#         indices, _ = unique_ravelled(indices, (n, n), axis=1)
+#         return indices
 
-    def pos_to_sparse(indices):
-        return tf.SparseTensor(indices, tf.ones((indices.shape[0],)), (n, n))
+#     def pos_to_sparse(indices):
+#         return tf.SparseTensor(indices, tf.ones((indices.shape[0],)), (n, n))
 
-    if symmetric:
-        # no point in making test_pos symmetric
-        train_pos = to_symmetric(train_pos)
+#     if symmetric:
+#         # no point in making test_pos symmetric
+#         train_pos = to_symmetric(train_pos)
 
-    adjacency = pos_to_sparse(train_pos)
-    adjacency = tf.sparse.reorder(adjacency)  # pylint: disable=no-value-for-parameter
-    if use_all_train_edges:
-        train_labels, train_weights = _get_train_labels_and_weights(
-            adjacency, remove_self_edges=remove_train_self_edges
-        )
-    else:
-        if remove_train_self_edges:
-            raise NotImplementedError("TODO")
-        train_labels = _sparse_to_labels(adjacency)
-        train_edges = _as_1d(adjacency.shape, train_pos, train_neg)
-        train_weights = preprocess_weights(train_edges, adjacency.shape[0] ** 2)
+#     adjacency = pos_to_sparse(train_pos)
+#     adjacency = tf.sparse.reorder(adjacency)  # pylint: disable=no-value-for-parameter
+#     if use_all_train_edges:
+#         train_labels, train_weights = _get_train_labels_and_weights(
+#             adjacency, remove_self_edges=remove_train_self_edges
+#         )
+#     else:
+#         if remove_train_self_edges:
+#             raise NotImplementedError("TODO")
+#         train_labels = _sparse_to_labels(adjacency)
+#         train_edges = _as_1d(adjacency.shape, train_pos, train_neg)
+#         train_weights = preprocess_weights(train_edges, adjacency.shape[0] ** 2)
 
-    all_edges = tf.concat((train_pos, test_pos), 0)
-    all_edges, _ = unique_ravelled(all_edges, (n, n), axis=1)
-    all_adj = pos_to_sparse(all_edges)
-    all_adj = tf.sparse.reorder(all_adj)  # pylint: disable=no-value-for-parameter
-    true_labels = _sparse_to_labels(all_adj)
+#     all_edges = tf.concat((train_pos, test_pos), 0)
+#     all_edges, _ = unique_ravelled(all_edges, (n, n), axis=1)
+#     all_adj = pos_to_sparse(all_edges)
+#     all_adj = tf.sparse.reorder(all_adj)  # pylint: disable=no-value-for-parameter
+#     true_labels = _sparse_to_labels(all_adj)
 
-    test_edges = _as_1d(adjacency.shape, test_pos, test_neg)
-    test_weights = preprocess_weights(test_edges, adjacency.shape[0] ** 2)
+#     test_edges = _as_1d(adjacency.shape, test_pos, test_neg)
+#     test_weights = preprocess_weights(test_edges, adjacency.shape[0] ** 2)
 
-    adjacency = transformed(adjacency, adjacency_transform)
+#     adjacency = transformed(adjacency, adjacency_transform)
 
-    return AutoencoderData(
-        None if features_fn is None else features_fn(adjacency.shape[0]),
-        adjacency,
-        train_labels,
-        true_labels,
-        train_weights,
-        None,
-        test_weights,
-    )
+#     return AutoencoderData(
+#         None if features_fn is None else features_fn(adjacency.shape[0]),
+#         adjacency,
+#         train_labels,
+#         true_labels,
+#         train_weights,
+#         None,
+#         test_weights,
+#     )
 
 
 def split_edges_walk_pooling(

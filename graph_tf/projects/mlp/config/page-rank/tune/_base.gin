@@ -1,0 +1,5 @@
+include "gtf_config/tune-v2.gin"
+
+tune_metric = "val_acc"
+tune_mode = "max"
+tune_scope = "avg"

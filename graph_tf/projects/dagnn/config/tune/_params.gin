@@ -1,0 +1,13 @@
+import graph_tf.mains.tune
+
+param_space = {
+    "l2_reg": @l2_reg/tune.grid_search(),
+    "num_propagations": @num_propagations/tune.grid_search(),
+    "dropout_rate": @dropout_rate/tune.grid_search(),
+}
+
+l2_reg/tune.grid_search.values = [1e-2, 2.5e-3, 2.5e-4, 2.5e-5]
+num_propagations/tune.grid_search.values = [5, 10, 20]
+dropout_rate/tune.grid_search.values = [0.5, 0.8]
+
+verbose = False

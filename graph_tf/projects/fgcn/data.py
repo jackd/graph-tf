@@ -94,7 +94,7 @@ def get_prefactorized_data(
         if ids is None:
             return None
         example = inputs, data.labels, preprocess_weights(ids, n, normalize=True)
-        return (example,)
+        return tf.data.Dataset.from_tensors(example)
 
     return DataSplit(
         get_data(data.train_ids), get_data(data.validation_ids), get_data(data.test_ids)

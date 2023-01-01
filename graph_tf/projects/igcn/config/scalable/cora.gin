@@ -3,7 +3,7 @@ import graph_tf.configurables.core
 problem = "cora"
 num_classes = 7
 epsilon = 0.1
-weight_decay = 5e-3
+l2_reg = 5e-3
 dropout_rate = 0.8
 hidden_units = (64,)
 

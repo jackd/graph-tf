@@ -1,0 +1,8 @@
+include "gtf_config/data/citations/cora.gin"
+include "ssgc/config/_base.gin"
+
+epochs = 100
+lr = 0.2
+alpha = 0.05
+weight_decay = 1e-5
+degree = 16

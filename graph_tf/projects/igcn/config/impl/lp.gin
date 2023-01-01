@@ -5,11 +5,6 @@ include "igcn/config/impl/_base.gin"
 model_fn = @gtf.igcn.models.logit_propagated_model
 gtf.igcn.models.logit_propagated_model.mlp_fn = @gtf.utils.models.mlp
 gtf.igcn.models.logit_propagated_model.num_classes = %num_classes
-gtf.igcn.models.logit_propagated_model.branched = %branched
-
-branched = False
-
-# define data_fn macro so we can turn off singleton easily later.
 
 data = @gin.singleton()
 data/gin.singleton.constructor = %data_fn
@@ -20,23 +15,38 @@ data/gin.singleton.constructor = %data_fn
 
 data_fn = @gtf.igcn.data.get_logit_propagated_split
 gtf.igcn.data.get_logit_propagated_split.data = %preprocessed_data
-gtf.igcn.data.get_logit_propagated_split.laplacian_fn = %laplacian_fn
 gtf.igcn.data.get_logit_propagated_split.train_propagator_fn = %train_propagator_fn
 gtf.igcn.data.get_logit_propagated_split.validation_propagator_fn = %validation_propagator_fn
 gtf.igcn.data.get_logit_propagated_split.test_propagator_fn = %test_propagator_fn
 
-laplacian_fn = @gtf.igcn.data.get_shifted_laplacian
-gtf.igcn.data.get_shifted_laplacian.epsilon = %epsilon
-
-train_propagator_fn = @gtf.igcn.data.preprocessed_sparse_cg_solver
-validation_propagator_fn = @gtf.igcn.data.preprocessed_sparse_cg_solver
+train_propagator_fn = @train/gtf.igcn.data.sparse_cg_solver
+validation_propagator_fn = @validation/gtf.igcn.data.sparse_cg_solver
 test_propagator_fn = @gtf.igcn.data.sparse_cg_solver
 
+gtf.igcn.data.sparse_cg_solver.preprocess = %test_preprocess
+gtf.igcn.data.sparse_cg_solver.epsilon = %epsilon
+gtf.igcn.data.sparse_cg_solver.rescaled = %rescaled
+gtf.igcn.data.sparse_cg_solver.renormalized = %renormalized
+gtf.igcn.data.sparse_cg_solver.symmetric = %symmetric
+gtf.igcn.data.sparse_cg_solver.parallel_iterations = %parallel_iterations
+gtf.igcn.data.sparse_cg_solver.rescale_factor = %rescale_factor
+
+
+train/gtf.igcn.data.sparse_cg_solver.preprocess = %preprocess
+validation/gtf.igcn.data.sparse_cg_solver.preprocess = %preprocess
+
 gtf.igcn.data.sparse_cg_solver.max_iter = %max_iter
-gtf.igcn.data.preprocessed_sparse_cg_solver.max_iter = %max_iter
 gtf.igcn.data.sparse_cg_solver.tol = %tol
-gtf.igcn.data.preprocessed_sparse_cg_solver.tol = %tol
+gtf.igcn.data.sparse_cg_solver.show_progress = %show_progress
 
 epsilon = 0.1
-max_iter = 100
+max_iter = 1000000
 tol = 1e-5
+show_progress = False
+renormalized = False
+rescaled = False
+preprocess = True
+test_preprocess = False
+symmetric = True
+parallel_iterations = None
+rescale_factor = 1.0
